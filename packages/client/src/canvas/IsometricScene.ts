@@ -70,7 +70,7 @@ export class IsometricScene extends EventEmitter {
     for (const zone of ZONES) {
       const backZone = {
         ...zone,
-        walls: zone.walls.filter((w) => w.side === 'top' || w.side === 'left'),
+        walls: zone.walls.filter((w) => w === 'top' || w === 'left'),
       };
       drawZoneWalls(g, backZone);
     }
@@ -82,7 +82,7 @@ export class IsometricScene extends EventEmitter {
     for (const zone of ZONES) {
       const frontZone = {
         ...zone,
-        walls: zone.walls.filter((w) => w.side === 'bottom' || w.side === 'right'),
+        walls: zone.walls.filter((w) => w === 'bottom' || w === 'right'),
       };
       drawZoneWalls(g, frontZone);
     }
