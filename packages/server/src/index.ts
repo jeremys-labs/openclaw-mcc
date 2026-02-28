@@ -13,6 +13,7 @@ import { createFileRoutes } from './routes/files.js';
 import { createStandupRoutes } from './routes/standup.js';
 import { createChannelRoutes } from './routes/channels.js';
 import { createAgentDataRoutes } from './routes/agent-data.js';
+import { createVoiceRouter, startVoiceHealthChecks, stopVoiceHealthChecks } from './routes/voice.js';
 
 const PORT = parseInt(process.env.SERVER_PORT || '8081', 10);
 
@@ -80,12 +81,16 @@ app.use('/api', createFileRoutes(contentRoot));
 app.use('/api', createStandupRoutes(contentRoot));
 app.use('/api', createChannelRoutes(contentRoot));
 app.use('/api', createAgentDataRoutes(config, contentRoot));
+app.use('/api', createVoiceRouter(config));
 
 // Start server
 const server = app.listen(PORT, () => {
   console.log(`[Server] Listening on port ${PORT}`);
   console.log(`[Server] Content root: ${contentRoot}`);
   console.log(`[Server] Agents: ${Object.keys(config.agents).join(', ')}`);
+
+  // Start voice service health checks
+  startVoiceHealthChecks();
 
   // Connect to gateway
   gateway.connect();
@@ -94,6 +99,7 @@ const server = app.listen(PORT, () => {
 // Graceful shutdown
 function shutdown() {
   console.log('[Server] Shutting down...');
+  stopVoiceHealthChecks();
   gateway.disconnect();
   db.close();
   server.close(() => {
