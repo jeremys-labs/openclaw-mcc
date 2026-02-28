@@ -16,13 +16,15 @@ describe('GatewayClient', () => {
     const client = new GatewayClient('ws://localhost:18789', 'my-secret');
     const payload = client.buildConnectPayload();
 
+    expect(payload.type).toBe('req');
     expect(payload.method).toBe('connect');
-    expect(payload.id).toBeTypeOf('number');
-    expect(payload.params).toEqual({
-      token: 'my-secret',
-      role: 'operator',
-      scopes: ['operator.read', 'operator.write', 'operator.admin'],
-    });
+    expect(payload.id).toBeTypeOf('string');
+    const params = payload.params as Record<string, unknown>;
+    expect(params.role).toBe('operator');
+    expect(params.scopes).toEqual(['operator.read', 'operator.write', 'operator.admin']);
+    expect(params.auth).toEqual({ token: 'my-secret' });
+    expect(params.minProtocol).toBe(3);
+    expect(params.maxProtocol).toBe(3);
   });
 
   it('nextId increments', () => {
@@ -31,7 +33,7 @@ describe('GatewayClient', () => {
     const id2 = client.nextId();
     const id3 = client.nextId();
 
-    expect(id2).toBe(id1 + 1);
-    expect(id3).toBe(id2 + 1);
+    expect(Number(id2)).toBe(Number(id1) + 1);
+    expect(Number(id3)).toBe(Number(id2) + 1);
   });
 });

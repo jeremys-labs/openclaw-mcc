@@ -62,16 +62,14 @@ export function createChatRouter({ config, db, gateway, streaming }: ChatDeps): 
     }
 
     // Forward to gateway
-    const agent = config.agents[agentKey];
-    const session = `agent:${agentKey}:webchat:user`;
+    const sessionKey = `agent:${agentKey}:webchat:user`;
 
     try {
       if (gateway.isConnected) {
         await gateway.request('chat.send', {
-          session,
-          channel: agent.channel,
-          content,
-          agent: agentKey,
+          sessionKey,
+          message: content,
+          idempotencyKey: key,
         });
       }
     } catch (err) {
@@ -111,11 +109,11 @@ export function createChatRouter({ config, db, gateway, streaming }: ChatDeps): 
     const agentKey = getAgentKey(req);
     if (!validateAgent(config, agentKey, res)) return;
 
-    const session = `agent:${agentKey}:webchat:user`;
+    const sessionKey = `agent:${agentKey}:webchat:user`;
 
     try {
       if (gateway.isConnected) {
-        await gateway.request('chat.interrupt', { session, agent: agentKey });
+        await gateway.request('chat.interrupt', { sessionKey });
       }
       streaming.broadcastAbort(agentKey, '', 'User interrupted');
       res.json({ interrupted: true });

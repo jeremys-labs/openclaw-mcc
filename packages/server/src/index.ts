@@ -32,31 +32,58 @@ const gateway = new GatewayClient(config.gateway.url, config.gateway.token);
 // Chat streaming service
 const streaming = new ChatStreamService();
 
-// Handle gateway events for chat deltas/finals
+// Build reverse lookup: sessionKey -> agentKey
+const sessionToAgent: Record<string, string> = {};
+for (const key of Object.keys(config.agents)) {
+  sessionToAgent[`agent:${key}:webchat:user`] = key;
+}
+
+// Extract text content from Gateway message object
+function extractMessageText(message: Record<string, unknown>): string | null {
+  const content = message.content;
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter((block: Record<string, unknown>) => block.type === 'text')
+      .map((block: Record<string, unknown>) => block.text as string)
+      .join('');
+  }
+  if (typeof message.text === 'string') return message.text;
+  return null;
+}
+
+// Handle gateway events
+// Gateway sends: { type: 'event', event: 'chat', payload: { state, sessionKey, message } }
 gateway.on('event', (frame: Record<string, unknown>) => {
-  const event = (frame.event || frame.type) as string;
-  const data = (frame.data || frame.params || frame) as Record<string, unknown>;
-  const agent = data.agent as string | undefined;
+  const event = frame.event as string;
 
-  if (!agent) return;
+  if (event === 'chat') {
+    const payload = frame.payload as Record<string, unknown>;
+    if (!payload) return;
 
-  const messageId = (data.messageId || data.id || '') as string;
+    const sessionKey = payload.sessionKey as string;
+    const agent = sessionToAgent[sessionKey];
+    if (!agent) return;
 
-  if (event === 'chat.delta' || event === 'message.delta') {
-    streaming.broadcastDelta(agent, messageId, data.content as string);
-  } else if (event === 'chat.final' || event === 'message.final') {
-    const content = (data.content || data.fullContent) as string;
-    const timestamp = Date.now();
-    const result = db.addMessage(agent, 'assistant', content, timestamp);
-    streaming.broadcastFinal(agent, messageId, content, result.seq);
-  } else if (event === 'chat.error' || event === 'message.error') {
-    streaming.broadcastError(agent, messageId, (data.error || data.message) as string);
-  } else if (event === 'context.update') {
-    streaming.broadcastContextUpdate(
-      agent,
-      data.tokens as number,
-      data.maxTokens as number,
-    );
+    const state = payload.state as string;
+    const message = payload.message as Record<string, unknown> | undefined;
+
+    if (state === 'delta' && message) {
+      const text = extractMessageText(message);
+      if (text) {
+        streaming.broadcastDelta(agent, '', text);
+      }
+    } else if (state === 'final' && message) {
+      const text = extractMessageText(message);
+      if (text) {
+        const timestamp = Date.now();
+        const result = db.addMessage(agent, 'assistant', text, timestamp);
+        streaming.broadcastFinal(agent, '', text, result.seq);
+      }
+    } else if (state === 'error') {
+      const error = (payload.error || 'Unknown error') as string;
+      streaming.broadcastError(agent, '', error);
+    }
   }
 });
 

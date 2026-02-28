@@ -14,7 +14,7 @@ export class GatewayClient extends EventEmitter {
   private ws: WebSocket | null = null;
   private state: GatewayState = 'disconnected';
   private requestId = 0;
-  private pendingRequests = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>();
+  private pendingRequests = new Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>();
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempts = 0;
@@ -30,18 +30,22 @@ export class GatewayClient extends EventEmitter {
     return this.state === 'connected';
   }
 
-  nextId(): number {
-    return ++this.requestId;
+  nextId(): string {
+    return String(++this.requestId);
   }
 
   buildConnectPayload(): Record<string, unknown> {
     return {
+      type: 'req',
       id: this.nextId(),
       method: 'connect',
       params: {
-        token: this.token,
+        minProtocol: 3,
+        maxProtocol: 3,
+        client: { id: 'openclaw-control-ui', version: '1.0.0', platform: 'web', mode: 'ui' },
         role: 'operator',
         scopes: ['operator.read', 'operator.write', 'operator.admin'],
+        auth: { token: this.token },
       },
     };
   }
@@ -50,7 +54,8 @@ export class GatewayClient extends EventEmitter {
     this.shouldReconnect = true;
     this.setState('connecting');
 
-    this.ws = new WebSocket(this.url);
+    const wsUrl = this.url.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:');
+    this.ws = new WebSocket(wsUrl, { headers: { Origin: this.url } });
 
     this.ws.on('open', () => {
       // Wait for connect.challenge before sending auth
@@ -86,7 +91,7 @@ export class GatewayClient extends EventEmitter {
     }
 
     const id = this.nextId();
-    const payload = JSON.stringify({ id, method, params });
+    const payload = JSON.stringify({ type: 'req', id, method, params });
 
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -112,46 +117,41 @@ export class GatewayClient extends EventEmitter {
   }
 
   private handleFrame(frame: Record<string, unknown>): void {
-    // Challenge event
-    if (frame.event === 'connect.challenge') {
+    // Challenge event — Gateway sends this immediately on connection
+    if (frame.event === 'connect.challenge' || (frame.type === 'event' && frame.event === 'connect.challenge')) {
       const connectPayload = this.buildConnectPayload();
       this.ws!.send(JSON.stringify(connectPayload));
       return;
     }
 
-    // Response frame
-    if (frame.type === 'res' || (typeof frame.id === 'number' && frame.result !== undefined)) {
-      const id = frame.id as number;
+    // Response frame — Gateway uses { type: 'res', id, ok, payload/error }
+    if (frame.type === 'res' && frame.id != null) {
+      const id = String(frame.id);
       const pending = this.pendingRequests.get(id);
       if (pending) {
         clearTimeout(pending.timer);
         this.pendingRequests.delete(id);
-        if (frame.error) {
-          pending.reject(new Error(String(frame.error)));
+        if (frame.ok === false || frame.error) {
+          pending.reject(new Error(typeof frame.error === 'string' ? frame.error : JSON.stringify(frame.error || 'Request failed')));
         } else {
-          pending.resolve(frame.result);
+          pending.resolve(frame.payload);
         }
       }
 
       // If this is a connect response, mark as connected
-      if (frame.result && typeof frame.result === 'object' && 'connected' in (frame.result as Record<string, unknown>)) {
-        this.reconnectAttempts = 0;
-        this.setState('connected');
-        this.startPing();
+      if (frame.ok !== false && frame.payload && typeof frame.payload === 'object') {
+        const payload = frame.payload as Record<string, unknown>;
+        if (payload.server || payload.connected) {
+          this.reconnectAttempts = 0;
+          this.setState('connected');
+          this.startPing();
+        }
       }
       return;
     }
 
-    // Auth success response (connect method response without pending request)
-    if (frame.method === 'connect' && frame.result) {
-      this.reconnectAttempts = 0;
-      this.setState('connected');
-      this.startPing();
-      return;
-    }
-
-    // Event frame
-    if (frame.event || frame.type === 'event') {
+    // Event frame — Gateway uses { type: 'event', event: '...', payload: {...} }
+    if (frame.type === 'event' && frame.event) {
       this.emit('event', frame);
       return;
     }
