@@ -1,0 +1,58 @@
+import { useEffect } from 'react';
+import { useStandupStore } from '../stores/standupStore';
+import { useAgentStore } from '../stores/agentStore';
+
+export function StandupWidget() {
+  const { date, agents: standupAgents, loading, fetch: fetchStandup } = useStandupStore();
+  const agents = useAgentStore((s) => s.agents);
+
+  useEffect(() => {
+    fetchStandup();
+    const interval = setInterval(fetchStandup, 60000);
+    return () => clearInterval(interval);
+  }, [fetchStandup]);
+
+  if (loading) return null;
+
+  const completed = Object.values(standupAgents).filter((a) => a.status === 'completed').length;
+  const total = Object.keys(standupAgents).length;
+
+  return (
+    <div className="bg-surface-raised rounded-lg border border-white/10 p-3">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Standup</h3>
+        <span className="text-xs text-text-secondary">{date || 'No data'}</span>
+      </div>
+      {total > 0 && (
+        <div className="text-sm mb-2">{completed}/{total} completed</div>
+      )}
+      <div className="space-y-1.5">
+        {Object.entries(standupAgents).map(([key, standup]) => {
+          const agent = agents[key];
+          return (
+            <details key={key} className="group">
+              <summary className="flex items-center gap-2 cursor-pointer text-sm hover:text-text-primary list-none">
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${
+                    standup.status === 'completed'
+                      ? 'bg-green-500'
+                      : standup.status === 'blocked'
+                        ? 'bg-red-500'
+                        : 'bg-yellow-500'
+                  }`}
+                />
+                <span>{agent?.emoji}</span>
+                <span className="text-text-secondary">{agent?.name || key}</span>
+              </summary>
+              <div className="ml-6 mt-1 text-xs text-text-secondary space-y-1">
+                {standup.yesterday && <div><strong>Yesterday:</strong> {standup.yesterday}</div>}
+                {standup.today && <div><strong>Today:</strong> {standup.today}</div>}
+                {standup.blockers && <div className="text-red-400"><strong>Blockers:</strong> {standup.blockers}</div>}
+              </div>
+            </details>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
