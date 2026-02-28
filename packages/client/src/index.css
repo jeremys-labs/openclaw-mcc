@@ -8,3 +8,8 @@
   --color-text-primary: #f1f5f9;
   --color-text-secondary: #94a3b8;
 }
+
+/* Safe area padding for iOS notch/home indicator */
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

@@ -1,11 +1,18 @@
 import { useUIStore } from '../stores/uiStore';
 
+const NAV_ICONS: Record<string, string> = {
+  office: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4',
+  channels: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z',
+  files: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+};
+
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { activeView, setView } = useUIStore();
 
   return (
     <div className="h-screen w-screen bg-surface text-text-primary flex flex-col overflow-hidden">
-      <header className="h-12 bg-surface-raised border-b border-white/10 flex items-center px-4 shrink-0">
+      {/* Desktop top nav */}
+      <header className="h-12 bg-surface-raised border-b border-white/10 hidden md:flex items-center px-4 shrink-0">
         <h1 className="text-sm font-semibold">OpenClaw Office</h1>
         <nav className="ml-auto flex gap-2">
           {(['office', 'channels', 'files'] as const).map((view) => (
@@ -21,20 +28,41 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
       </header>
-      <div className="flex-1 flex overflow-hidden relative">
+
+      {/* Mobile top bar - minimal branding only */}
+      <header className="h-10 bg-surface-raised border-b border-white/10 flex md:hidden items-center px-4 shrink-0">
+        <h1 className="text-sm font-semibold">OpenClaw Office</h1>
+      </header>
+
+      {/* Main content - add bottom padding on mobile for bottom nav */}
+      <div className="flex-1 flex overflow-hidden relative pb-14 md:pb-0">
         {children}
       </div>
-      <footer className="h-14 bg-surface-raised border-t border-white/10 flex items-center justify-around px-4 md:hidden">
+
+      {/* Mobile bottom tab bar */}
+      <nav className="fixed bottom-0 left-0 right-0 h-14 bg-surface-raised border-t border-white/10 flex items-center justify-around px-4 z-50 md:hidden safe-area-pb">
         {(['office', 'channels', 'files'] as const).map((view) => (
           <button
             key={view}
             onClick={() => setView(view)}
-            className={`text-xs capitalize ${activeView === view ? 'text-accent' : 'text-text-secondary'}`}
+            className={`flex flex-col items-center gap-0.5 py-1 px-3 ${
+              activeView === view ? 'text-accent' : 'text-text-secondary'
+            }`}
           >
-            {view}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d={NAV_ICONS[view]} />
+            </svg>
+            <span className="text-[10px] capitalize">{view}</span>
           </button>
         ))}
-      </footer>
+      </nav>
     </div>
   );
 }

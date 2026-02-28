@@ -10,6 +10,7 @@ export class IsometricScene extends EventEmitter {
   private isDragging = false;
   private dragStart = { x: 0, y: 0 };
   private worldStart = { x: 0, y: 0 };
+  private lastPinchDist = 0;
 
   constructor(app: Application, agents: Record<string, AgentConfig>) {
     super();
@@ -117,6 +118,35 @@ export class IsometricScene extends EventEmitter {
       const newScale = Math.max(0.3, Math.min(3, scale - e.deltaY * 0.001));
       this.world.scale.set(newScale);
     }, { passive: false });
+
+    // Pinch-to-zoom for touch devices
+    const canvas = this.app.canvas as HTMLCanvasElement;
+    canvas.addEventListener('touchstart', (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        this.lastPinchDist = Math.sqrt(dx * dx + dy * dy);
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e: TouchEvent) => {
+      if (e.touches.length === 2 && this.lastPinchDist > 0) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const scaleFactor = dist / this.lastPinchDist;
+        const scale = this.world.scale.x;
+        const newScale = Math.max(0.3, Math.min(3, scale * scaleFactor));
+        this.world.scale.set(newScale);
+        this.lastPinchDist = dist;
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', () => {
+      this.lastPinchDist = 0;
+    });
   }
 
   destroy(): void {
