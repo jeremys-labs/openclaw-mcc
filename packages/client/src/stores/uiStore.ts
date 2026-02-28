@@ -19,3 +19,9 @@ export const useUIStore = create<UIState>((set) => ({
   openAgentPanel: (agentKey) => set({ activeAgent: agentKey, panelOpen: true }),
   closePanel: () => set({ panelOpen: false }),
 }));
+
+// Expose for debugging
+if (import.meta.env.DEV) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (window as any).__uiStore = useUIStore;
+}

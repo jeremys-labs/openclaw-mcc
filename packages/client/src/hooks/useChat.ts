@@ -2,24 +2,26 @@ import { useCallback } from 'react';
 import { useChatStore } from '../stores/chatStore';
 
 export function useChat(agentKey: string) {
-  const { addMessage, drafts, setDraft } = useChatStore();
+  const addMessage = useChatStore((s) => s.addMessage);
+  const setDraftAction = useChatStore((s) => s.setDraft);
+  const draft = useChatStore((s) => s.drafts[agentKey] ?? '');
 
   const sendMessage = useCallback(async (content: string) => {
-    const _idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = crypto.randomUUID();
     addMessage(agentKey, {
       seq: Date.now(),
       role: 'user',
       content,
       timestamp: Date.now(),
     });
-    setDraft(agentKey, '');
+    setDraftAction(agentKey, '');
 
     await fetch(`/api/chat/${agentKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content, idempotencyKey: _idempotencyKey }),
+      body: JSON.stringify({ content, idempotencyKey }),
     });
-  }, [agentKey, addMessage, setDraft]);
+  }, [agentKey, addMessage, setDraftAction]);
 
   const loadHistory = useCallback(async () => {
     const res = await fetch(`/api/chat-history/${agentKey}`);
@@ -31,9 +33,13 @@ export function useChat(agentKey: string) {
     await fetch(`/api/chat/${agentKey}/interrupt`, { method: 'POST' });
   }, [agentKey]);
 
+  const setDraft = useCallback((text: string) => {
+    setDraftAction(agentKey, text);
+  }, [agentKey, setDraftAction]);
+
   return {
-    draft: drafts[agentKey] || '',
-    setDraft: (text: string) => setDraft(agentKey, text),
+    draft,
+    setDraft,
     sendMessage,
     loadHistory,
     interrupt,

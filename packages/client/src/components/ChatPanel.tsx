@@ -9,6 +9,8 @@ import { useChatStore } from '../stores/chatStore';
 import { useVoiceStore } from '../stores/voiceStore';
 import { useAgentStore } from '../stores/agentStore';
 
+const EMPTY_MESSAGES: { seq: number; role: 'user' | 'assistant'; content: string; timestamp: number }[] = [];
+
 interface Props {
   agentKey: string;
 }
@@ -16,13 +18,17 @@ interface Props {
 export function ChatPanel({ agentKey }: Props) {
   const { draft, setDraft, sendMessage, loadHistory, interrupt } = useChat(agentKey);
   const { speak } = useVoice();
-  const messages = useChatStore((s) => s.messages[agentKey] || []);
-  const isStreaming = useChatStore((s) => s.streaming[agentKey] || false);
-  const streamBuffer = useChatStore((s) => s.streamBuffer[agentKey] || '');
+  const messages = useChatStore((s) => s.messages[agentKey] ?? EMPTY_MESSAGES);
+  const isStreaming = useChatStore((s) => !!s.streaming[agentKey]);
+  const streamBuffer = useChatStore((s) => s.streamBuffer[agentKey] ?? '');
   const activeVoiceAgent = useVoiceStore((s) => s.activeAgent);
   const agent = useAgentStore((s) => s.agents[agentKey]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevMsgCountRef = useRef(0);
+
+  // Keep speak ref stable to avoid re-render loops
+  const speakRef = useRef(speak);
+  speakRef.current = speak;
 
   // When voice mode is active and a new assistant message arrives, speak it
   useEffect(() => {
@@ -33,13 +39,12 @@ export function ChatPanel({ agentKey }: Props) {
     if (messages.length > prevMsgCountRef.current) {
       const last = messages[messages.length - 1];
       if (last && last.role === 'assistant' && last.content) {
-        // Speak only first 500 chars to keep TTS responsive
         const text = last.content.length > 500 ? last.content.slice(0, 500) : last.content;
-        speak(text, agentKey);
+        speakRef.current(text, agentKey);
       }
     }
     prevMsgCountRef.current = messages.length;
-  }, [messages, activeVoiceAgent, agentKey, speak]);
+  }, [messages, activeVoiceAgent, agentKey]);
 
   const handleVoiceTranscript = useCallback(
     (text: string) => {

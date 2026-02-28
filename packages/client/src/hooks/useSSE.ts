@@ -3,7 +3,9 @@ import { useChatStore } from '../stores/chatStore';
 
 export function useSSE(agentKey: string | null) {
   const eventSourceRef = useRef<EventSource | null>(null);
-  const { appendStreamBuffer, finalizeStream, setStreaming } = useChatStore();
+  const appendStreamBuffer = useChatStore((s) => s.appendStreamBuffer);
+  const finalizeStream = useChatStore((s) => s.finalizeStream);
+  const setStreaming = useChatStore((s) => s.setStreaming);
 
   useEffect(() => {
     if (!agentKey) return;
