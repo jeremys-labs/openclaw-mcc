@@ -21,7 +21,7 @@ export const useUIStore = create<UIState>((set) => ({
 }));
 
 // Expose for debugging
-if (import.meta.env.DEV) {
+if (import.meta.env.DEV && typeof window !== 'undefined') {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).__uiStore = useUIStore;
 }
