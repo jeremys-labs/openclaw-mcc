@@ -6,6 +6,7 @@ interface Message {
   content: string;
   timestamp: number;
   streaming?: boolean;
+  error?: string;
 }
 
 interface ChatState {

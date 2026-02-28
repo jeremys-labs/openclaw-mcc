@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useConfig } from './hooks/useConfig';
 import { useUIStore } from './stores/uiStore';
 import { useAgentStore } from './stores/agentStore';
+import { useConnectionStore } from './stores/connectionStore';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { OfficeCanvas } from './canvas/OfficeCanvas';
 import { ChatPanel } from './components/ChatPanel';
@@ -12,8 +13,54 @@ import { StandupWidget } from './components/StandupWidget';
 
 export default function App() {
   useConfig();
-  const { activeView, activeAgent, panelOpen, closePanel } = useUIStore();
-  const { loading, error } = useAgentStore();
+  const activeView = useUIStore((s) => s.activeView);
+  const activeAgent = useUIStore((s) => s.activeAgent);
+  const panelOpen = useUIStore((s) => s.panelOpen);
+  const closePanel = useUIStore((s) => s.closePanel);
+  const loading = useAgentStore((s) => s.loading);
+  const error = useAgentStore((s) => s.error);
+  const setGatewayStatus = useConnectionStore((s) => s.setGatewayStatus);
+
+  // Health check poller
+  useEffect(() => {
+    let mounted = true;
+
+    async function checkHealth() {
+      try {
+        const res = await fetch('/api/health');
+        if (!res.ok) throw new Error('Health check failed');
+        const data = await res.json();
+        if (!mounted) return;
+        if (data.gateway === 'connected' || data.gateway === true) {
+          setGatewayStatus('connected');
+        } else if (data.gateway === 'reconnecting') {
+          setGatewayStatus('reconnecting');
+        } else {
+          setGatewayStatus('disconnected');
+        }
+      } catch {
+        if (mounted) setGatewayStatus('disconnected');
+      }
+    }
+
+    checkHealth();
+    const interval = setInterval(checkHealth, 30_000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [setGatewayStatus]);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        closePanel();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [closePanel]);
 
   if (loading) {
     return (

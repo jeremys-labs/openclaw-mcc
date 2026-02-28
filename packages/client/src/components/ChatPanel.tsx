@@ -16,7 +16,7 @@ interface Props {
 }
 
 export function ChatPanel({ agentKey }: Props) {
-  const { draft, setDraft, sendMessage, loadHistory, interrupt } = useChat(agentKey);
+  const { draft, setDraft, sendMessage, retryMessage, loadHistory, interrupt } = useChat(agentKey);
   const { speak } = useVoice();
   const messages = useChatStore((s) => s.messages[agentKey] ?? EMPTY_MESSAGES);
   const isStreaming = useChatStore((s) => !!s.streaming[agentKey]);
@@ -83,14 +83,27 @@ export function ChatPanel({ agentKey }: Props) {
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4">
-        {messages.map((msg, i) => (
-          <ChatMessage
-            key={msg.seq || i}
-            role={msg.role}
-            content={msg.content}
-            agentName={msg.role === 'assistant' ? agent?.name : undefined}
-          />
-        ))}
+        {messages.map((msg, i) => {
+          // For error messages, find the preceding user message to get the original content for retry
+          const prevUserMsg = msg.error
+            ? messages.slice(0, i).reverse().find((m) => m.role === 'user')
+            : null;
+
+          return (
+            <ChatMessage
+              key={msg.seq || i}
+              role={msg.role}
+              content={msg.content}
+              agentName={msg.role === 'assistant' ? agent?.name : undefined}
+              error={msg.error}
+              onRetry={
+                msg.error && prevUserMsg
+                  ? () => retryMessage(prevUserMsg.content, msg.seq)
+                  : undefined
+              }
+            />
+          );
+        })}
         {isStreaming && streamBuffer && (
           <ChatMessage role="assistant" content={streamBuffer} agentName={agent?.name} streaming />
         )}

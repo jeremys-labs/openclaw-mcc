@@ -1,4 +1,5 @@
 import { useUIStore } from '../stores/uiStore';
+import { useConnectionStore } from '../stores/connectionStore';
 
 const NAV_ICONS: Record<string, string> = {
   office: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4',
@@ -6,11 +7,32 @@ const NAV_ICONS: Record<string, string> = {
   files: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
 };
 
+function ConnectionBanner() {
+  const gatewayStatus = useConnectionStore((s) => s.gatewayStatus);
+
+  if (gatewayStatus === 'connected') return null;
+
+  if (gatewayStatus === 'disconnected') {
+    return (
+      <div className="bg-red-700 text-white text-xs text-center py-1.5 px-4 shrink-0">
+        Gateway disconnected — messages may not be delivered
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-yellow-600 text-white text-xs text-center py-1.5 px-4 shrink-0">
+      Reconnecting to gateway...
+    </div>
+  );
+}
+
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { activeView, setView } = useUIStore();
 
   return (
     <div className="h-screen w-screen bg-surface text-text-primary flex flex-col overflow-hidden">
+      <ConnectionBanner />
       {/* Desktop top nav */}
       <header className="h-12 bg-surface-raised border-b border-white/10 hidden md:flex items-center px-4 shrink-0">
         <h1 className="text-sm font-semibold">OpenClaw Office</h1>
