@@ -5,7 +5,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   test: {
-    exclude: ['e2e/**', 'node_modules/**'],
+    exclude: ['**/e2e/**', '**/node_modules/**'],
   },
   plugins: [
     react(),
@@ -26,6 +26,9 @@ export default defineConfig({
           { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
           { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
+      },
+      devOptions: {
+        enabled: true,
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],

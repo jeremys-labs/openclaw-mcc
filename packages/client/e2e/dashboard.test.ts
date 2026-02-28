@@ -44,7 +44,7 @@ async function mockApiRoutes(page: Page) {
   );
 
   // Stub chat history endpoints to return empty arrays
-  await page.route('**/api/agents/*/messages', (route) =>
+  await page.route('**/api/chat-history/*', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -53,7 +53,7 @@ async function mockApiRoutes(page: Page) {
   );
 
   // Stub SSE stream endpoints so they don't hang
-  await page.route('**/api/agents/*/stream', (route) =>
+  await page.route('**/api/chat-stream/*', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'text/event-stream',
@@ -61,12 +61,41 @@ async function mockApiRoutes(page: Page) {
     }),
   );
 
+  // Stub health, standup, channels endpoints
+  await page.route('**/api/health', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ status: 'ok', gateway: 'connected' }),
+    }),
+  );
+
+  await page.route('**/api/standup', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ agents: {} }),
+    }),
+  );
+
+  await page.route('**/api/channels', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ channels: [], recent: [] }),
+    }),
+  );
+
   // Stub any other /api/* call with a 200 empty JSON
   await page.route('**/api/**', (route) => {
-    // Only intercept if not already handled above
-    if (route.request().url().includes('/api/config')) return route.fallback();
-    if (route.request().url().includes('/messages')) return route.fallback();
-    if (route.request().url().includes('/stream')) return route.fallback();
+    const url = route.request().url();
+    // Only intercept if not already handled by specific routes above
+    if (url.includes('/api/config')) return route.fallback();
+    if (url.includes('/api/chat-history/')) return route.fallback();
+    if (url.includes('/api/chat-stream/')) return route.fallback();
+    if (url.includes('/api/health')) return route.fallback();
+    if (url.includes('/api/standup')) return route.fallback();
+    if (url.includes('/api/channels')) return route.fallback();
     return route.fulfill({
       status: 200,
       contentType: 'application/json',

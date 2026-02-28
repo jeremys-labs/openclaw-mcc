@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useConfig } from './hooks/useConfig';
 import { useUIStore } from './stores/uiStore';
 import { useAgentStore } from './stores/agentStore';
 import { useConnectionStore } from './stores/connectionStore';
 import { DashboardLayout } from './layouts/DashboardLayout';
-import { OfficeCanvas } from './canvas/OfficeCanvas';
 import { ChatPanel } from './components/ChatPanel';
+
+// Lazy-load PixiJS canvas to keep initial bundle small
+const OfficeCanvas = lazy(() => import('./canvas/OfficeCanvas').then(m => ({ default: m.OfficeCanvas })));
 import { AgentInfoTabs } from './components/AgentInfoTabs';
 import { ChannelsView } from './components/ChannelsView';
 import { FileReview } from './components/FileReview';
@@ -85,7 +87,13 @@ export default function App() {
         <div className="flex-1 relative overflow-hidden">
           {activeView === 'office' && (
             <>
-              <OfficeCanvas />
+              <Suspense fallback={
+                <div className="h-full w-full bg-surface flex items-center justify-center text-text-secondary">
+                  Loading office...
+                </div>
+              }>
+                <OfficeCanvas />
+              </Suspense>
               <div className="absolute top-2 right-2 w-56 md:top-4 md:right-4 md:w-72 z-10">
                 <StandupWidget />
               </div>
