@@ -63,8 +63,24 @@ export function createFileRoutes(contentRoot: string): Router {
         });
       res.json({ path: relPath, entries });
     } else {
-      // Serve file content
-      res.sendFile(absPath);
+      // Serve file content with appropriate content type
+      const ext = path.extname(absPath).toLowerCase();
+      const mimeTypes: Record<string, string> = {
+        '.md': 'text/plain; charset=utf-8',
+        '.txt': 'text/plain; charset=utf-8',
+        '.json': 'application/json; charset=utf-8',
+        '.html': 'text/html; charset=utf-8',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.svg': 'image/svg+xml',
+        '.webp': 'image/webp',
+        '.pdf': 'application/pdf',
+      };
+      const contentType = mimeTypes[ext] || 'text/plain; charset=utf-8';
+      res.setHeader('Content-Type', contentType);
+      fs.createReadStream(absPath).pipe(res);
     }
   });
 
