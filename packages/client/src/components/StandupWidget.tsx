@@ -45,9 +45,9 @@ export function StandupWidget() {
                 <span className="text-text-secondary">{agent?.name || key}</span>
               </summary>
               <div className="ml-6 mt-1 text-xs text-text-secondary space-y-1">
-                {standup.yesterday && <div><strong>Yesterday:</strong> {standup.yesterday}</div>}
-                {standup.today && <div><strong>Today:</strong> {standup.today}</div>}
+                {standup.today && <div><strong>Working on:</strong> {standup.today}</div>}
                 {standup.blockers && <div className="text-red-400"><strong>Blockers:</strong> {standup.blockers}</div>}
+                {standup.learned && <div className="text-blue-400"><strong>Learned:</strong> {standup.learned}</div>}
               </div>
             </details>
           );

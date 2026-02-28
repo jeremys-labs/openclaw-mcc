@@ -4,19 +4,23 @@ import path from 'path';
 
 export function createChannelRoutes(contentRoot: string): Router {
   const router = Router();
-  const interactionsPath = path.join(contentRoot, 'memory', 'agent-interactions.json');
+  const interactionsPaths = [
+    path.join(contentRoot, 'workspace', 'memory', 'agent-interactions.json'),
+    path.join(contentRoot, 'memory', 'agent-interactions.json'),
+  ];
 
   router.get('/channels', (_req, res) => {
-    try {
-      if (fs.existsSync(interactionsPath)) {
-        const data = JSON.parse(fs.readFileSync(interactionsPath, 'utf-8'));
+    for (const p of interactionsPaths) {
+      try {
+        if (!fs.existsSync(p)) continue;
+        const data = JSON.parse(fs.readFileSync(p, 'utf-8'));
         res.json(data);
-      } else {
-        res.json({ channels: [], interactions: [] });
+        return;
+      } catch {
+        continue;
       }
-    } catch {
-      res.json({ channels: [], interactions: [] });
     }
+    res.json({ channels: [], interactions: [] });
   });
 
   return router;

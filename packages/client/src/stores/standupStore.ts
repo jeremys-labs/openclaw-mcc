@@ -5,6 +5,7 @@ interface AgentStandup {
   yesterday?: string;
   today?: string;
   blockers?: string;
+  learned?: string;
   completedAt?: string;
 }
 

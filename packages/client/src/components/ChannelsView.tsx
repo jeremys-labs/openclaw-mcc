@@ -61,7 +61,14 @@ export function ChannelsView() {
                     {agents[msg.from]?.name || msg.from} → {agents[msg.to]?.name || msg.to}
                     <span className="ml-2">{new Date(msg.timestamp).toLocaleTimeString()}</span>
                   </div>
-                  <div className="text-sm text-text-primary">{msg.content}</div>
+                  <div className="text-sm text-text-primary">
+                    {msg.type && (
+                      <span className="text-[10px] uppercase px-1 py-0.5 rounded bg-surface-overlay text-text-secondary mr-1.5">
+                        {msg.type}
+                      </span>
+                    )}
+                    {msg.content}
+                  </div>
                 </div>
               </div>
             ))}
