@@ -1,7 +1,27 @@
-import { Application, Container, Graphics, Text, TextStyle } from 'pixi.js';
+import { Application, Container, Graphics } from 'pixi.js';
 import EventEmitter from 'eventemitter3';
 import type { AgentConfig } from '../types/agent';
-import { TILE_WIDTH, TILE_HEIGHT, isoToScreen } from './tiles';
+import { isoToScreen } from './tiles';
+import { ZONES, resolveZone, drawZoneFloor, drawZoneWalls } from './rooms';
+import {
+  drawDesk,
+  drawDualMonitorDesk,
+  drawConferenceTable,
+  drawKitchenCounter,
+  drawStove,
+  drawFridge,
+  drawCouch,
+  drawCoffeeTable,
+  drawPlant,
+  drawWhiteboard,
+  drawBookshelf,
+  drawWaterCooler,
+} from './furniture';
+import {
+  drawCharacter,
+  drawNameLabel,
+  roleToAccessory,
+} from './characters';
 
 export class IsometricScene extends EventEmitter {
   private app: Application;
@@ -22,74 +42,156 @@ export class IsometricScene extends EventEmitter {
   }
 
   render(): void {
-    this.drawFloor(12, 10);
+    this.drawFloors();
+    this.drawBackWalls();
+    this.drawFurniture();
     this.drawAgents();
-    // Center the world
+    this.drawFrontWalls();
+
+    // Center the world in the viewport
     this.world.x = this.app.screen.width / 2;
-    this.world.y = 100;
+    this.world.y = 80;
   }
 
-  private drawFloor(cols: number, rows: number): void {
-    const floor = new Graphics();
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const { x, y } = isoToScreen(c, r);
-        const color = (r + c) % 2 === 0 ? 0x2d2d4a : 0x25253e;
-        floor.poly([
-          { x, y },
-          { x: x + TILE_WIDTH / 2, y: y + TILE_HEIGHT / 2 },
-          { x, y: y + TILE_HEIGHT },
-          { x: x - TILE_WIDTH / 2, y: y + TILE_HEIGHT / 2 },
-        ]);
-        floor.fill(color);
-        floor.stroke({ width: 1, color: 0x3d3d5a, alpha: 0.3 });
-      }
+  // ─── Floor layer ────────────────────────────────────────────────
+
+  private drawFloors(): void {
+    const g = new Graphics();
+    for (const zone of ZONES) {
+      drawZoneFloor(g, zone);
     }
-    this.world.addChild(floor);
+    this.world.addChild(g);
   }
+
+  // ─── Walls (back = top + left, front = bottom + right) ─────────
+
+  private drawBackWalls(): void {
+    const g = new Graphics();
+    for (const zone of ZONES) {
+      const backZone = {
+        ...zone,
+        walls: zone.walls.filter((w) => w.side === 'top' || w.side === 'left'),
+      };
+      drawZoneWalls(g, backZone);
+    }
+    this.world.addChild(g);
+  }
+
+  private drawFrontWalls(): void {
+    const g = new Graphics();
+    for (const zone of ZONES) {
+      const frontZone = {
+        ...zone,
+        walls: zone.walls.filter((w) => w.side === 'bottom' || w.side === 'right'),
+      };
+      drawZoneWalls(g, frontZone);
+    }
+    this.world.addChild(g);
+  }
+
+  // ─── Furniture layer ────────────────────────────────────────────
+
+  private drawFurniture(): void {
+    const furnitureLayer = new Container();
+
+    // ── Main workspace: decorative plants, water cooler ──
+    drawPlant(furnitureLayer, 0, 1, 'large');
+    drawPlant(furnitureLayer, 15, 1, 'large');
+    drawPlant(furnitureLayer, 0, 5, 'small');
+    drawPlant(furnitureLayer, 15, 5, 'small');
+    drawWaterCooler(furnitureLayer, 14, 0);
+
+    // ── Conference room ──
+    drawConferenceTable(furnitureLayer, 2, 9);
+    drawWhiteboard(furnitureLayer, 1, 7);
+    drawPlant(furnitureLayer, 4, 7, 'small');
+
+    // ── Lounge ──
+    drawCouch(furnitureLayer, 7, 9);
+    drawCoffeeTable(furnitureLayer, 7, 10);
+    drawBookshelf(furnitureLayer, 5, 8);
+    drawPlant(furnitureLayer, 10, 8, 'large');
+    drawPlant(furnitureLayer, 5, 10, 'small');
+
+    // ── Kitchen ──
+    drawKitchenCounter(furnitureLayer, 12, 8);
+    drawStove(furnitureLayer, 13, 8);
+    drawFridge(furnitureLayer, 15, 8);
+    drawPlant(furnitureLayer, 11, 10, 'small');
+
+    this.world.addChild(furnitureLayer);
+  }
+
+  // ─── Agent layer (desks + characters, y-sorted) ─────────────────
 
   private drawAgents(): void {
-    for (const [key, agent] of Object.entries(this.agents)) {
-      const pos = agent.position || { x: 1, y: 1 };
-      const { x, y } = isoToScreen(pos.x, pos.y);
+    const entries = Object.entries(this.agents).map(([key, agent]) => {
+      const zone = resolveZone(agent.position?.zone || 'desk');
+      const zoneDef = ZONES.find((z) => z.id === zone) || ZONES[0];
+      const col = zoneDef.originCol + (agent.position?.x ?? 1);
+      const row = zoneDef.originRow + (agent.position?.y ?? 1);
+      return { key, agent, col, row };
+    });
 
-      const container = new Container();
-      container.x = x;
-      container.y = y;
-      container.eventMode = 'static';
-      container.cursor = 'pointer';
+    // Sort by row (y) for correct isometric depth
+    entries.sort((a, b) => a.row - b.row || a.col - b.col);
 
-      // Colored circle as placeholder avatar
-      const circle = new Graphics();
-      circle.circle(0, -16, 20);
-      circle.fill(parseInt(agent.color.from.replace('#', ''), 16));
-      container.addChild(circle);
+    for (const { key, agent, col, row } of entries) {
+      const { x, y } = isoToScreen(col, row);
 
-      // Emoji label
-      const label = new Text({
-        text: agent.emoji,
-        style: new TextStyle({ fontSize: 24 }),
+      // Draw desk (or dual-monitor desk for architect)
+      if (agent.position?.zone === 'kitchen') {
+        // Kitchen agents don't get a desk
+      } else if (agent.role.toLowerCase().includes('architect')) {
+        drawDualMonitorDesk(this.world, col, row);
+      } else {
+        drawDesk(this.world, col, row);
+      }
+
+      const agentContainer = new Container();
+      agentContainer.x = x;
+      agentContainer.y = y;
+      agentContainer.eventMode = 'static';
+      agentContainer.cursor = 'pointer';
+
+      // Draw the character
+      const accessory = roleToAccessory(agent.role);
+      drawCharacter(agentContainer, {
+        agentKey: key,
+        shirtColor: agent.color.from,
+        accessory,
       });
-      label.anchor.set(0.5, 0.5);
-      label.y = -16;
-      container.addChild(label);
 
-      // Name below
-      const nameText = new Text({
-        text: agent.name,
-        style: new TextStyle({ fontSize: 10, fill: 0xf1f5f9 }),
+      // Name label
+      drawNameLabel(agentContainer, agent.name, 4);
+
+      // Hover highlight
+      const highlight = new Graphics();
+      highlight.circle(0, -14, 18);
+      highlight.fill({ color: 0xffffff, alpha: 0 });
+      agentContainer.addChild(highlight);
+
+      agentContainer.on('pointerover', () => {
+        highlight.clear();
+        highlight.circle(0, -14, 18);
+        highlight.fill({ color: 0xffffff, alpha: 0.1 });
       });
-      nameText.anchor.set(0.5, 0);
-      nameText.y = 8;
-      container.addChild(nameText);
+      agentContainer.on('pointerout', () => {
+        highlight.clear();
+        highlight.circle(0, -14, 18);
+        highlight.fill({ color: 0xffffff, alpha: 0 });
+      });
 
-      container.on('pointerdown', (e: { stopPropagation: () => void }) => {
+      agentContainer.on('pointerdown', (e: { stopPropagation: () => void }) => {
         e.stopPropagation();
         this.emit('agentClick', key);
       });
-      this.world.addChild(container);
+
+      this.world.addChild(agentContainer);
     }
   }
+
+  // ─── Pan & Zoom ─────────────────────────────────────────────────
 
   private setupPanZoom(): void {
     const stage = this.app.stage;
@@ -108,41 +210,55 @@ export class IsometricScene extends EventEmitter {
       this.world.y = this.worldStart.y + (e.global.y - this.dragStart.y);
     });
 
-    stage.on('pointerup', () => { this.isDragging = false; });
-    stage.on('pointerupoutside', () => { this.isDragging = false; });
+    stage.on('pointerup', () => {
+      this.isDragging = false;
+    });
+    stage.on('pointerupoutside', () => {
+      this.isDragging = false;
+    });
 
-    // Zoom with mouse wheel
-    this.app.canvas.addEventListener('wheel', (e: WheelEvent) => {
-      e.preventDefault();
-      const scale = this.world.scale.x;
-      const newScale = Math.max(0.3, Math.min(3, scale - e.deltaY * 0.001));
-      this.world.scale.set(newScale);
-    }, { passive: false });
-
-    // Pinch-to-zoom for touch devices
-    const canvas = this.app.canvas as HTMLCanvasElement;
-    canvas.addEventListener('touchstart', (e: TouchEvent) => {
-      if (e.touches.length === 2) {
+    this.app.canvas.addEventListener(
+      'wheel',
+      (e: WheelEvent) => {
         e.preventDefault();
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        this.lastPinchDist = Math.sqrt(dx * dx + dy * dy);
-      }
-    }, { passive: false });
-
-    canvas.addEventListener('touchmove', (e: TouchEvent) => {
-      if (e.touches.length === 2 && this.lastPinchDist > 0) {
-        e.preventDefault();
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const scaleFactor = dist / this.lastPinchDist;
         const scale = this.world.scale.x;
-        const newScale = Math.max(0.3, Math.min(3, scale * scaleFactor));
+        const newScale = Math.max(0.3, Math.min(3, scale - e.deltaY * 0.001));
         this.world.scale.set(newScale);
-        this.lastPinchDist = dist;
-      }
-    }, { passive: false });
+      },
+      { passive: false },
+    );
+
+    const canvas = this.app.canvas as HTMLCanvasElement;
+    canvas.addEventListener(
+      'touchstart',
+      (e: TouchEvent) => {
+        if (e.touches.length === 2) {
+          e.preventDefault();
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          this.lastPinchDist = Math.sqrt(dx * dx + dy * dy);
+        }
+      },
+      { passive: false },
+    );
+
+    canvas.addEventListener(
+      'touchmove',
+      (e: TouchEvent) => {
+        if (e.touches.length === 2 && this.lastPinchDist > 0) {
+          e.preventDefault();
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const scaleFactor = dist / this.lastPinchDist;
+          const scale = this.world.scale.x;
+          const newScale = Math.max(0.3, Math.min(3, scale * scaleFactor));
+          this.world.scale.set(newScale);
+          this.lastPinchDist = dist;
+        }
+      },
+      { passive: false },
+    );
 
     canvas.addEventListener('touchend', () => {
       this.lastPinchDist = 0;
