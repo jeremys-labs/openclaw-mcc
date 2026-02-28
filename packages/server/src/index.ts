@@ -11,6 +11,7 @@ import { createConfigRouter } from './routes/config.js';
 import { createHealthRouter } from './routes/health.js';
 import { createFileRoutes } from './routes/files.js';
 import { createStandupRoutes } from './routes/standup.js';
+import { createChannelRoutes } from './routes/channels.js';
 
 const PORT = parseInt(process.env.SERVER_PORT || '8081', 10);
 
@@ -76,6 +77,7 @@ app.use('/api', createConfigRouter(config));
 app.use('/api', createChatRouter({ config, db, gateway, streaming }));
 app.use('/api', createFileRoutes(contentRoot));
 app.use('/api', createStandupRoutes(contentRoot));
+app.use('/api', createChannelRoutes(contentRoot));
 
 // Start server
 const server = app.listen(PORT, () => {
