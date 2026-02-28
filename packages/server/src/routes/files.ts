@@ -2,10 +2,18 @@ import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 
+interface DirEntry {
+  name: string;
+  type: 'file' | 'directory';
+  size?: number;
+}
+
 export function createFileRoutes(contentRoot: string): Router {
   const router = Router();
   const filesDir = path.join(contentRoot, 'files');
+  const docsDir = path.join(contentRoot, 'workspace', 'docs');
 
+  // List files in review folders (inbox/approved/archive)
   router.get('/files', (_req, res) => {
     const result: Record<string, string[]> = {};
     for (const folder of ['inbox', 'approved', 'archive']) {
@@ -19,6 +27,48 @@ export function createFileRoutes(contentRoot: string): Router {
     res.json(result);
   });
 
+  // Browse workspace docs directory tree
+  // GET /api/docs?path=relative/path (defaults to root)
+  router.get('/docs', (req, res) => {
+    const relPath = (req.query.path as string) || '';
+    const absPath = path.join(docsDir, relPath);
+
+    // Prevent path traversal
+    if (!absPath.startsWith(docsDir)) {
+      res.status(400).json({ error: 'Invalid path' });
+      return;
+    }
+
+    if (!fs.existsSync(absPath)) {
+      res.status(404).json({ error: 'Path not found' });
+      return;
+    }
+
+    const stat = fs.statSync(absPath);
+    if (stat.isDirectory()) {
+      const entries: DirEntry[] = fs.readdirSync(absPath)
+        .filter((f) => !f.startsWith('.'))
+        .map((name) => {
+          const s = fs.statSync(path.join(absPath, name));
+          return {
+            name,
+            type: s.isDirectory() ? 'directory' as const : 'file' as const,
+            size: s.isFile() ? s.size : undefined,
+          };
+        })
+        .sort((a, b) => {
+          // Directories first, then alphabetical
+          if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+          return a.name.localeCompare(b.name);
+        });
+      res.json({ path: relPath, entries });
+    } else {
+      // Serve file content
+      res.sendFile(absPath);
+    }
+  });
+
+  // Serve a specific file from review folders
   router.get('/files/:folder/:filename', (req, res) => {
     const { folder, filename } = req.params;
     if (!['inbox', 'approved', 'archive'].includes(folder as string)) {
@@ -33,6 +83,7 @@ export function createFileRoutes(contentRoot: string): Router {
     res.sendFile(filePath);
   });
 
+  // Move file between review folders
   router.post('/files/:folder/:filename/move', (req, res) => {
     const { folder, filename } = req.params;
     const { to } = req.body;

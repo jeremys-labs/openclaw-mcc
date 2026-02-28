@@ -3,22 +3,23 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 interface Props {
-  folder: string;
+  url: string;
   filename: string;
 }
 
-export function FileViewer({ folder, filename }: Props) {
+export function FileViewer({ url, filename }: Props) {
   const [content, setContent] = useState<string>('');
   const ext = filename.split('.').pop()?.toLowerCase();
 
   useEffect(() => {
-    fetch(`/api/files/${folder}/${filename}`)
+    if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext || '')) return;
+    fetch(url)
       .then((r) => r.text())
       .then(setContent);
-  }, [folder, filename]);
+  }, [url, ext]);
 
   if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext || '')) {
-    return <img src={`/api/files/${folder}/${filename}`} alt={filename} className="max-w-full" />;
+    return <img src={url} alt={filename} className="max-w-full" />;
   }
 
   if (ext === 'md') {
