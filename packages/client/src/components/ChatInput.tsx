@@ -13,9 +13,22 @@ export function ChatInput({ value, onChange, onSend, onInterrupt, isStreaming, p
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Auto-resize textarea to fit content
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 160) + 'px';
+  }, [value]);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key === 'Enter') {
+        // Shift+Enter or Ctrl+Enter or Alt/Option+Enter → insert newline
+        if (e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) {
+          return; // let the browser insert the newline naturally
+        }
+        // Plain Enter → send
         e.preventDefault();
         if (isStreaming && onInterrupt) {
           onInterrupt();
@@ -43,7 +56,7 @@ export function ChatInput({ value, onChange, onSend, onInterrupt, isStreaming, p
 
   return (
     <div ref={containerRef} className="border-t border-white/10 p-3 bg-surface-raised">
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-end">
         <textarea
           ref={textareaRef}
           value={value}

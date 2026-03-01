@@ -34,7 +34,13 @@ export function useSSE(agentKey: string | null) {
 
       es.addEventListener('message.aborted', () => {
         retryCountRef.current = 0;
-        setStreaming(agentKey, false);
+        // Keep any partial content that was already streamed
+        const buffer = useChatStore.getState().streamBuffer[agentKey!] ?? '';
+        if (buffer) {
+          finalizeStream(agentKey!, buffer + '\n\n*[stopped]*');
+        } else {
+          setStreaming(agentKey!, false);
+        }
       });
 
       es.addEventListener('message.error', (e) => {
