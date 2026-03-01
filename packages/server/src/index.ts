@@ -120,6 +120,27 @@ app.use('/api', createVoiceRouter(config));
 
 // Serve built client (production)
 const clientDist = path.join(import.meta.dirname, '../../client/dist');
+
+// Force no-cache on service worker files so updates propagate immediately
+app.get(['/sw.js', '/registerSW.js'], (_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  next();
+});
+
+// Nuke endpoint: unregisters SW and clears caches from the client
+app.get('/api/clear-cache', (_req, res) => {
+  res.type('html').send(`<!doctype html><html><body><script>
+(async()=>{
+  const regs=await navigator.serviceWorker.getRegistrations();
+  for(const r of regs) await r.unregister();
+  const keys=await caches.keys();
+  for(const k of keys) await caches.delete(k);
+  document.body.innerText='Caches cleared, SW unregistered. Redirecting...';
+  setTimeout(()=>location.href='/',1500);
+})();
+</script></body></html>`);
+});
+
 app.use(express.static(clientDist));
 app.get('*splat', (_req, res) => {
   const indexPath = path.join(clientDist, 'index.html');
