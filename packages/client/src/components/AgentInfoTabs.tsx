@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAgentStore } from '../stores/agentStore';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkFrontmatter from 'remark-frontmatter';
 
 interface Props {
   agentKey: string;
@@ -265,9 +266,9 @@ export function AgentInfoTabs({ agentKey }: Props) {
       <div className="flex-1 overflow-y-auto p-3">
         {loading ? (
           <div className="text-text-secondary text-sm">Loading...</div>
-        ) : renderer === 'markdown' && typeof tabData === 'string' ? (
+        ) : (renderer === 'markdown' || typeof tabData === 'string') && typeof tabData === 'string' ? (
           <div className="prose prose-invert prose-sm max-w-none">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{tabData}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm, remarkFrontmatter]}>{tabData}</ReactMarkdown>
           </div>
         ) : (
           <JsonRenderer data={tabData} />
