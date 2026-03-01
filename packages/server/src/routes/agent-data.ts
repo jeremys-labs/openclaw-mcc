@@ -17,13 +17,56 @@ export function createAgentDataRoutes(config: AppConfig, contentRoot: string): R
     const source = tab.source;
 
     if (source.startsWith('file:')) {
-      const filePath = path.join(contentRoot, 'data', source.slice(5));
-      if (!fs.existsSync(filePath)) { res.json(null); return; }
-      const ext = path.extname(filePath);
+      const fileName = source.slice(5);
+      const baseName = fileName.replace(/\.[^.]+$/, '');
+
+      // Search order: agent-specific workspace dir, then global data dir
+      const searchDirs = [
+        path.join(contentRoot, 'workspace', 'agents', agentKey as string),
+        path.join(contentRoot, 'data'),
+      ];
+
+      // Try exact filename, then alternate extension (.md↔.json)
+      const candidates = [
+        fileName,
+        ...(fileName.endsWith('.json') ? [`${baseName}.md`] : [`${baseName}.json`]),
+      ];
+
+      let resolved: string | null = null;
+      for (const dir of searchDirs) {
+        for (const candidate of candidates) {
+          const p = path.join(dir, candidate);
+          if (fs.existsSync(p)) { resolved = p; break; }
+        }
+        if (resolved) break;
+      }
+
+      if (!resolved) { res.json(null); return; }
+
+      const ext = path.extname(resolved);
       if (ext === '.json') {
-        res.json(JSON.parse(fs.readFileSync(filePath, 'utf-8')));
+        res.json(JSON.parse(fs.readFileSync(resolved, 'utf-8')));
       } else {
-        res.type('text/plain').send(fs.readFileSync(filePath, 'utf-8'));
+        res.type('text/plain').send(fs.readFileSync(resolved, 'utf-8'));
+      }
+      return;
+    }
+
+    if (source === 'about') {
+      const aboutPath = path.join(contentRoot, 'workspace', 'agents', agentKey as string, 'about.md');
+      if (fs.existsSync(aboutPath)) {
+        res.type('text/plain').send(fs.readFileSync(aboutPath, 'utf-8'));
+      } else {
+        // Fallback until the agent creates their about.md
+        const lines = [
+          `# ${agent.name}`,
+          '',
+          `**Role:** ${agent.role}`,
+          '',
+        ];
+        if (agent.quote) lines.push(`> ${agent.quote}`, '');
+        lines.push(`**Channel:** ${agent.channel}`);
+        res.type('text/plain').send(lines.join('\n'));
       }
       return;
     }
