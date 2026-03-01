@@ -58,7 +58,9 @@ export class GatewayClient extends EventEmitter {
     this.ws = new WebSocket(wsUrl, { headers: { Origin: this.url } });
 
     this.ws.on('open', () => {
-      // Wait for connect.challenge before sending auth
+      // Send connect request immediately — gateway expects it as the first frame
+      const connectPayload = this.buildConnectPayload();
+      this.ws!.send(JSON.stringify(connectPayload));
     });
 
     this.ws.on('message', (data: WebSocket.Data) => {
