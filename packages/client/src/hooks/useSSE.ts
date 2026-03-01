@@ -22,14 +22,14 @@ export function useSSE(agentKey: string | null) {
       es.addEventListener('message.delta', (e) => {
         const data = JSON.parse(e.data);
         retryCountRef.current = 0;
-        setStreaming(agentKey, true);
-        appendStreamBuffer(agentKey, data.content);
+        setStreaming(agentKey!, true);
+        appendStreamBuffer(agentKey!, data.content);
       });
 
       es.addEventListener('message.final', (e) => {
         const data = JSON.parse(e.data);
         retryCountRef.current = 0;
-        finalizeStream(agentKey, data.content);
+        finalizeStream(agentKey!, data.content);
       });
 
       es.addEventListener('message.aborted', () => {
@@ -46,7 +46,7 @@ export function useSSE(agentKey: string | null) {
       es.addEventListener('message.error', (e) => {
         console.error('SSE error:', JSON.parse(e.data));
         retryCountRef.current = 0;
-        setStreaming(agentKey, false);
+        setStreaming(agentKey!, false);
       });
 
       es.onerror = () => {

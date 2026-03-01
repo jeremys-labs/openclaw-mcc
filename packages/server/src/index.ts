@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import fs from 'fs';
 import path from 'path';
 import { loadConfig, resolveContentRoot } from './config.js';
 import { ensureContentDirs } from './content.js';
@@ -109,6 +110,15 @@ app.use('/api', createStandupRoutes(contentRoot));
 app.use('/api', createChannelRoutes(contentRoot));
 app.use('/api', createAgentDataRoutes(config, contentRoot));
 app.use('/api', createVoiceRouter(config));
+
+// Serve built client (production)
+const clientDist = path.join(import.meta.dirname, '../../client/dist');
+app.use(express.static(clientDist));
+app.get('*splat', (_req, res) => {
+  const indexPath = path.join(clientDist, 'index.html');
+  res.type('html');
+  fs.createReadStream(indexPath).pipe(res);
+});
 
 // Start server
 const server = app.listen(PORT, () => {
