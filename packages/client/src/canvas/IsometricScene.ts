@@ -1,4 +1,4 @@
-import { Application, Container, Graphics } from 'pixi.js';
+import { Application, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import EventEmitter from 'eventemitter3';
 import type { AgentConfig } from '../types/agent';
 import { isoToScreen } from './tiles';
@@ -10,18 +10,9 @@ import {
   drawKitchenCounter,
   drawStove,
   drawFridge,
-  drawCouch,
-  drawCoffeeTable,
-  drawPlant,
   drawWhiteboard,
-  drawBookshelf,
-  drawWaterCooler,
 } from './furniture';
-import {
-  drawCharacter,
-  drawNameLabel,
-  roleToAccessory,
-} from './characters';
+import { drawNameLabel } from './characters';
 
 export class IsometricScene extends EventEmitter {
   private app: Application;
@@ -31,11 +22,17 @@ export class IsometricScene extends EventEmitter {
   private dragStart = { x: 0, y: 0 };
   private worldStart = { x: 0, y: 0 };
   private lastPinchDist = 0;
+  private avatarTextures: Map<string, Texture>;
 
-  constructor(app: Application, agents: Record<string, AgentConfig>) {
+  constructor(
+    app: Application,
+    agents: Record<string, AgentConfig>,
+    avatarTextures: Map<string, Texture>,
+  ) {
     super();
     this.app = app;
     this.agents = agents;
+    this.avatarTextures = avatarTextures;
     this.world = new Container();
     this.app.stage.addChild(this.world);
     this.setupPanZoom();
@@ -94,30 +91,14 @@ export class IsometricScene extends EventEmitter {
   private drawFurniture(): void {
     const furnitureLayer = new Container();
 
-    // ── Main workspace: decorative plants, water cooler ──
-    drawPlant(furnitureLayer, 0, 1, 'large');
-    drawPlant(furnitureLayer, 15, 1, 'large');
-    drawPlant(furnitureLayer, 0, 5, 'small');
-    drawPlant(furnitureLayer, 15, 5, 'small');
-    drawWaterCooler(furnitureLayer, 14, 0);
-
     // ── Conference room ──
     drawConferenceTable(furnitureLayer, 2, 9);
     drawWhiteboard(furnitureLayer, 1, 7);
-    drawPlant(furnitureLayer, 4, 7, 'small');
-
-    // ── Lounge ──
-    drawCouch(furnitureLayer, 7, 9);
-    drawCoffeeTable(furnitureLayer, 7, 10);
-    drawBookshelf(furnitureLayer, 5, 8);
-    drawPlant(furnitureLayer, 10, 8, 'large');
-    drawPlant(furnitureLayer, 5, 10, 'small');
 
     // ── Kitchen ──
     drawKitchenCounter(furnitureLayer, 12, 8);
     drawStove(furnitureLayer, 13, 8);
     drawFridge(furnitureLayer, 15, 8);
-    drawPlant(furnitureLayer, 11, 10, 'small');
 
     this.world.addChild(furnitureLayer);
   }
@@ -151,35 +132,37 @@ export class IsometricScene extends EventEmitter {
       const agentContainer = new Container();
       agentContainer.x = x;
       agentContainer.y = y;
-      agentContainer.scale.set(2);
       agentContainer.eventMode = 'static';
       agentContainer.cursor = 'pointer';
 
-      // Draw the character
-      const accessory = roleToAccessory(agent.role);
-      drawCharacter(agentContainer, {
-        agentKey: key,
-        shirtColor: agent.color.from,
-        accessory,
-      });
+      // Draw DiceBear pixel-art avatar as Sprite
+      const texture = this.avatarTextures.get(key);
+      if (texture) {
+        const sprite = new Sprite(texture);
+        sprite.anchor.set(0.5, 1);
+        sprite.width = 42;
+        sprite.height = 42;
+        sprite.y = 4;
+        agentContainer.addChild(sprite);
+      }
 
-      // Name label (at scaled coordinates)
-      drawNameLabel(agentContainer, agent.name, 6);
+      // Name label below avatar
+      drawNameLabel(agentContainer, agent.name, 8);
 
       // Hover highlight
       const highlight = new Graphics();
-      highlight.circle(0, -14, 20);
+      highlight.circle(0, -16, 26);
       highlight.fill({ color: 0xffffff, alpha: 0 });
       agentContainer.addChild(highlight);
 
       agentContainer.on('pointerover', () => {
         highlight.clear();
-        highlight.circle(0, -14, 20);
+        highlight.circle(0, -16, 26);
         highlight.fill({ color: 0xffffff, alpha: 0.1 });
       });
       agentContainer.on('pointerout', () => {
         highlight.clear();
-        highlight.circle(0, -14, 20);
+        highlight.circle(0, -16, 26);
         highlight.fill({ color: 0xffffff, alpha: 0 });
       });
 

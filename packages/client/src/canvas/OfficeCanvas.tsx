@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Application } from 'pixi.js';
 import { IsometricScene } from './IsometricScene';
+import { preloadAllAvatars, destroyAvatarTextures } from './avatars';
 import { useAgentStore } from '../stores/agentStore';
 import { useUIStore } from '../stores/uiStore';
 
@@ -38,7 +39,15 @@ export function OfficeCanvas() {
         appRef.current = app;
         container.appendChild(app.canvas);
 
-        const scene = new IsometricScene(app, agents);
+        const avatarTextures = await preloadAllAvatars(agents);
+
+        if (destroyed) {
+          destroyAvatarTextures();
+          app.destroy(true);
+          return;
+        }
+
+        const scene = new IsometricScene(app, agents, avatarTextures);
         sceneRef.current = scene;
 
         scene.on('agentClick', (agentKey: string) => {
@@ -81,6 +90,8 @@ export function OfficeCanvas() {
         sceneRef.current.destroy();
         sceneRef.current = null;
       }
+
+      destroyAvatarTextures();
 
       if (appRef.current) {
         try {
