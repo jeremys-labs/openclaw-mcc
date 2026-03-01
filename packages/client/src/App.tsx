@@ -94,7 +94,7 @@ export default function App() {
               }>
                 <OfficeCanvas />
               </Suspense>
-              <div className="absolute top-2 left-2 w-56 md:top-4 md:left-4 md:w-72 z-10">
+              <div className="absolute top-2 left-2 right-2 max-w-56 md:top-4 md:left-4 md:right-auto md:max-w-72 z-10">
                 <StandupWidget />
               </div>
             </>

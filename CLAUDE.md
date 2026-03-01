@@ -45,6 +45,16 @@ npm run test:server          # Vitest unit tests (24 tests)
 npm run test:e2e             # Playwright e2e (run from packages/client)
 ```
 
+## Production (launchd)
+
+The dashboard runs as a launchd service (`com.openclaw.mcc`) serving both API and client on port 8081. Source changes are **not** picked up automatically — you must rebuild and restart:
+
+```bash
+npm run build && launchctl kickstart -k gui/$(id -u)/com.openclaw.mcc
+```
+
+Dev mode (`npm run dev`) still auto-reloads as usual.
+
 ## Key Dependencies
 
 - **Client:** React 19, Tailwind v4 (`@plugin` syntax in CSS), PixiJS 8, Zustand 5, react-markdown, @tailwindcss/typography

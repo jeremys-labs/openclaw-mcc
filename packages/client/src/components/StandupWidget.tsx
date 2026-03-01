@@ -2,6 +2,19 @@ import { useEffect } from 'react';
 import { useStandupStore } from '../stores/standupStore';
 import { useAgentStore } from '../stores/agentStore';
 
+function formatStandupDate(raw: string | null): string {
+  if (!raw) return 'No data';
+  const parsed = new Date(raw);
+  if (isNaN(parsed.getTime())) return raw;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dateDay = new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+  const diffDays = Math.round((today.getTime() - dateDay.getTime()) / 86400000);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  return parsed.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
 export function StandupWidget() {
   const { date, agents: standupAgents, loading, fetch: fetchStandup } = useStandupStore();
   const agents = useAgentStore((s) => s.agents);
@@ -21,7 +34,7 @@ export function StandupWidget() {
     <div className="bg-surface-raised rounded-lg border border-white/10 p-3">
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Standup</h3>
-        <span className="text-xs text-text-secondary">{date || 'No data'}</span>
+        <span className="text-xs text-text-secondary">{formatStandupDate(date)}</span>
       </div>
       {total > 0 && (
         <div className="text-sm mb-2">{completed}/{total} completed</div>

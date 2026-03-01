@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 
+const SYSTEM_MSG_RE = /^(ANNOUNCE_SKIP|NO_REPLY|NO_?|SKIP|ACK|HEARTBEAT|PING|PONG)$/i;
+
 interface Message {
   seq: number;
   role: 'user' | 'assistant';
@@ -29,11 +31,22 @@ export const useChatStore = create<ChatState>((set) => ({
   streaming: {},
   streamBuffer: {},
   addMessage: (agent, msg) =>
-    set((s) => ({
-      messages: { ...s.messages, [agent]: [...(s.messages[agent] || []), msg] },
-    })),
+    set((s) => {
+      if (SYSTEM_MSG_RE.test(msg.content.trim())) return s;
+      const existing = s.messages[agent] || [];
+      // Deduplicate: skip if an identical message (same role + content) already exists
+      const isDuplicate = existing.some(
+        (m) => m.role === msg.role && m.content === msg.content
+      );
+      if (isDuplicate) return s;
+      return {
+        messages: { ...s.messages, [agent]: [...existing, msg] },
+      };
+    }),
   setMessages: (agent, msgs) =>
-    set((s) => ({ messages: { ...s.messages, [agent]: msgs } })),
+    set((s) => ({
+      messages: { ...s.messages, [agent]: msgs.filter((m) => !SYSTEM_MSG_RE.test(m.content.trim())) },
+    })),
   setDraft: (agent, text) =>
     set((s) => ({ drafts: { ...s.drafts, [agent]: text } })),
   setStreaming: (agent, streaming) =>
@@ -46,14 +59,27 @@ export const useChatStore = create<ChatState>((set) => ({
       streamBuffer: { ...s.streamBuffer, [agent]: (s.streamBuffer[agent] || '') + content },
     })),
   finalizeStream: (agent, content) =>
-    set((s) => ({
-      streaming: { ...s.streaming, [agent]: false },
-      streamBuffer: { ...s.streamBuffer, [agent]: '' },
-      messages: {
-        ...s.messages,
-        [agent]: [...(s.messages[agent] || []), { seq: Date.now(), role: 'assistant', content, timestamp: Date.now() }],
-      },
-    })),
+    set((s) => {
+      if (SYSTEM_MSG_RE.test(content.trim())) {
+        return { streaming: { ...s.streaming, [agent]: false }, streamBuffer: { ...s.streamBuffer, [agent]: '' } };
+      }
+      const existing = s.messages[agent] || [];
+      const isDuplicate = existing.some(
+        (m) => m.role === 'assistant' && m.content === content
+      );
+      return {
+        streaming: { ...s.streaming, [agent]: false },
+        streamBuffer: { ...s.streamBuffer, [agent]: '' },
+        messages: isDuplicate
+          ? s.messages
+          : { ...s.messages, [agent]: [...existing, { seq: Date.now(), role: 'assistant' as const, content, timestamp: Date.now() }] },
+      };
+    }),
   clearMessages: (agent) =>
     set((s) => ({ messages: { ...s.messages, [agent]: [] } })),
 }));
+
+// Expose for Playwright tests
+if (typeof window !== 'undefined') {
+  (window as unknown as Record<string, unknown>).__chatStore = useChatStore;
+}

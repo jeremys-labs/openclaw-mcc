@@ -13,6 +13,8 @@ interface ChatDeps {
   streaming: ChatStreamService;
 }
 
+const SYSTEM_MESSAGE_PATTERNS = /^(ANNOUNCE_SKIP|NO_REPLY|NO_?|SKIP|ACK|HEARTBEAT|PING|PONG)$/i;
+
 function getAgentKey(req: Request): string {
   const key = req.params.agentKey;
   return Array.isArray(key) ? key[0] : key;
@@ -88,10 +90,13 @@ export function createChatRouter({ config, db, gateway, streaming }: ChatDeps): 
     const sinceParam = req.query.since;
     const since = sinceParam ? Number(sinceParam) : undefined;
 
+    const filterSystem = (msgs: Record<string, unknown>[]) =>
+      msgs.filter((m) => !SYSTEM_MESSAGE_PATTERNS.test(String(m.content).trim()));
+
     if (since !== undefined && since > 0) {
-      res.json(db.getMessagesSince(agentKey, since));
+      res.json(filterSystem(db.getMessagesSince(agentKey, since)));
     } else {
-      res.json(db.getMessages(agentKey));
+      res.json(filterSystem(db.getMessages(agentKey)));
     }
   });
 

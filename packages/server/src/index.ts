@@ -39,6 +39,9 @@ for (const key of Object.keys(config.agents)) {
   sessionToAgent[`agent:${key}:webchat:user`] = key;
 }
 
+// Gateway protocol tokens that should not appear in chat
+const SYSTEM_MESSAGE_PATTERNS = /^(ANNOUNCE_SKIP|NO_REPLY|NO_?|SKIP|ACK|HEARTBEAT|PING|PONG)$/i;
+
 // Extract text content from Gateway message object
 function extractMessageText(message: Record<string, unknown>): string | null {
   const content = message.content;
@@ -51,6 +54,10 @@ function extractMessageText(message: Record<string, unknown>): string | null {
   }
   if (typeof message.text === 'string') return message.text;
   return null;
+}
+
+function isSystemMessage(text: string): boolean {
+  return SYSTEM_MESSAGE_PATTERNS.test(text.trim());
 }
 
 // Handle gateway events
@@ -71,12 +78,12 @@ gateway.on('event', (frame: Record<string, unknown>) => {
 
     if (state === 'delta' && message) {
       const text = extractMessageText(message);
-      if (text) {
+      if (text && !isSystemMessage(text)) {
         streaming.broadcastDelta(agent, '', text);
       }
     } else if (state === 'final' && message) {
       const text = extractMessageText(message);
-      if (text) {
+      if (text && !isSystemMessage(text)) {
         const timestamp = Date.now();
         const result = db.addMessage(agent, 'assistant', text, timestamp);
         streaming.broadcastFinal(agent, '', text, result.seq);
