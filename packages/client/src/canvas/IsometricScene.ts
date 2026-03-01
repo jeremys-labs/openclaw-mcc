@@ -151,6 +151,7 @@ export class IsometricScene extends EventEmitter {
       const agentContainer = new Container();
       agentContainer.x = x;
       agentContainer.y = y;
+      agentContainer.scale.set(2);
       agentContainer.eventMode = 'static';
       agentContainer.cursor = 'pointer';
 
@@ -162,23 +163,23 @@ export class IsometricScene extends EventEmitter {
         accessory,
       });
 
-      // Name label
-      drawNameLabel(agentContainer, agent.name, 4);
+      // Name label (at scaled coordinates)
+      drawNameLabel(agentContainer, agent.name, 6);
 
       // Hover highlight
       const highlight = new Graphics();
-      highlight.circle(0, -14, 18);
+      highlight.circle(0, -14, 20);
       highlight.fill({ color: 0xffffff, alpha: 0 });
       agentContainer.addChild(highlight);
 
       agentContainer.on('pointerover', () => {
         highlight.clear();
-        highlight.circle(0, -14, 18);
+        highlight.circle(0, -14, 20);
         highlight.fill({ color: 0xffffff, alpha: 0.1 });
       });
       agentContainer.on('pointerout', () => {
         highlight.clear();
-        highlight.circle(0, -14, 18);
+        highlight.circle(0, -14, 20);
         highlight.fill({ color: 0xffffff, alpha: 0 });
       });
 

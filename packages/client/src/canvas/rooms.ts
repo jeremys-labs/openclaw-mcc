@@ -92,7 +92,7 @@ export function drawZoneFloor(g: Graphics, zone: ZoneDef): void {
   }
 }
 
-const WALL_HEIGHT = 24;
+const WALL_HEIGHT = 36;
 const WALL_COLOR = 0x4a4a6a;
 const WALL_TOP_COLOR = 0x5a5a7a;
 

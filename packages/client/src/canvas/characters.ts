@@ -99,174 +99,190 @@ function hairColorFromKey(key: string): number {
 function drawAccessory(g: Graphics, accessory: RoleAccessory, _skinColor: number): void {
   switch (accessory) {
     case 'headset': {
-      // Headband — tight arc sitting on top of head (head top at y=-35)
-      g.arc(0, -35, 6, Math.PI, 0);
-      g.stroke({ width: 2, color: 0x333333 });
-      // Ear pads at head sides (head center y=-28, radius 7)
-      g.circle(-7, -29, 2.5);
-      g.fill(0x333333);
-      g.circle(7, -29, 2.5);
-      g.fill(0x333333);
-      // Mic arm curving down from left ear
-      g.moveTo(-7, -29);
-      g.lineTo(-9, -24);
-      g.lineTo(-7, -22);
-      g.stroke({ width: 1.5, color: 0x333333 });
-      // Mic tip
-      g.circle(-7, -22, 1.5);
+      // Headband arc on top of head
+      g.arc(0, -35, 7, Math.PI, 0);
+      g.stroke({ width: 2.5, color: 0x444444 });
+      // Ear pads at head sides
+      g.circle(-7, -29, 3);
       g.fill(0x444444);
+      g.circle(7, -29, 3);
+      g.fill(0x444444);
+      // Mic boom — extends visibly outward from left ear
+      g.moveTo(-7, -29);
+      g.lineTo(-13, -24);
+      g.lineTo(-12, -21);
+      g.stroke({ width: 2, color: 0x555555 });
+      // Bright green mic tip (distinguishes from headphones)
+      g.circle(-12, -21, 2.5);
+      g.fill(0x44dd44);
       break;
     }
     case 'headphones': {
-      // Headband — tight arc on top of head
-      g.arc(0, -35, 7, Math.PI, 0);
-      g.stroke({ width: 2, color: 0x222222 });
-      // Ear cups flush against head sides
-      g.roundRect(-10, -32, 4, 6, 1);
+      // Thicker headband arc
+      g.arc(0, -35, 8, Math.PI, 0);
+      g.stroke({ width: 3, color: 0x222222 });
+      // Larger ear cups — clearly visible
+      g.roundRect(-11, -33, 5, 8, 2);
       g.fill(0x222222);
-      g.roundRect(6, -32, 4, 6, 1);
+      g.roundRect(6, -33, 5, 8, 2);
       g.fill(0x222222);
+      // Inner ear cup detail (colored accent)
+      g.roundRect(-10, -31, 3, 4, 1);
+      g.fill(0x4444aa);
+      g.roundRect(7, -31, 3, 4, 1);
+      g.fill(0x4444aa);
       break;
     }
     case 'coffee-mug': {
-      // Large white mug held up high (clearly above desk line)
-      g.roundRect(11, -22, 7, 9, 1);
+      // Large white mug held in right hand, clearly right of body
+      g.roundRect(12, -20, 9, 11, 2);
       g.fill(0xffffff);
-      // Dark coffee inside
-      g.roundRect(12, -21, 5, 4, 0);
-      g.fill(0x664422);
+      // Dark coffee inside (brown fill visible from top)
+      g.roundRect(13, -19, 7, 5, 1);
+      g.fill(0x553311);
       // Handle on right
-      g.arc(18, -18, 3, -Math.PI / 2, Math.PI / 2, false);
-      g.stroke({ width: 2, color: 0xeeeeee });
-      // Steam wisps
-      g.moveTo(13, -23);
-      g.bezierCurveTo(13, -28, 15, -28, 15, -23);
-      g.stroke({ width: 1.5, color: 0xcccccc, alpha: 0.7 });
+      g.arc(21, -15, 4, -Math.PI / 2, Math.PI / 2, false);
+      g.stroke({ width: 2.5, color: 0xdddddd });
+      // Steam wisps — taller and more visible
+      g.moveTo(15, -21);
+      g.bezierCurveTo(14, -27, 17, -27, 16, -21);
+      g.stroke({ width: 2, color: 0xcccccc, alpha: 0.8 });
+      g.moveTo(18, -22);
+      g.bezierCurveTo(17, -26, 20, -26, 19, -22);
+      g.stroke({ width: 1.5, color: 0xcccccc, alpha: 0.6 });
       break;
     }
     case 'glasses-notepad': {
-      // Glasses at eye level (eyes at y=-28)
-      g.circle(-3, -28, 2.5);
-      g.stroke({ width: 1.5, color: 0xaaaacc });
-      g.circle(3, -28, 2.5);
-      g.stroke({ width: 1.5, color: 0xaaaacc });
-      // Bridge connecting lenses
-      g.moveTo(-0.5, -28);
-      g.lineTo(0.5, -28);
-      g.stroke({ width: 1.5, color: 0xaaaacc });
-      // Arms extending to ears
-      g.moveTo(-5.5, -28);
-      g.lineTo(-7, -28);
-      g.stroke({ width: 1.5, color: 0xaaaacc });
-      g.moveTo(5.5, -28);
-      g.lineTo(7, -28);
-      g.stroke({ width: 1.5, color: 0xaaaacc });
-      // Yellow notepad in left hand
-      g.roundRect(-15, -12, 6, 8, 1);
-      g.fill(0xeeee55);
+      // Glasses — filled white lenses with colored frames (much more visible)
+      g.roundRect(-6, -30, 5, 4, 1);
+      g.fill({ color: 0xffffff, alpha: 0.3 });
+      g.roundRect(-6, -30, 5, 4, 1);
+      g.stroke({ width: 2, color: 0xddddff });
+      g.roundRect(1, -30, 5, 4, 1);
+      g.fill({ color: 0xffffff, alpha: 0.3 });
+      g.roundRect(1, -30, 5, 4, 1);
+      g.stroke({ width: 2, color: 0xddddff });
+      // Bridge
+      g.moveTo(-1, -28);
+      g.lineTo(1, -28);
+      g.stroke({ width: 2, color: 0xddddff });
+      // Large yellow notepad held in left hand
+      g.roundRect(-17, -14, 8, 10, 1);
+      g.fill(0xffff44);
       // Lines on notepad
-      for (let i = 0; i < 3; i++) {
-        g.moveTo(-14, -10 + i * 2);
-        g.lineTo(-10, -10 + i * 2);
-        g.stroke({ width: 0.5, color: 0x888855 });
+      for (let i = 0; i < 4; i++) {
+        g.moveTo(-16, -12 + i * 2);
+        g.lineTo(-11, -12 + i * 2);
+        g.stroke({ width: 0.7, color: 0x888844 });
       }
       break;
     }
     case 'tablet': {
-      // Dark tablet held in front at body level
-      g.roundRect(-4, -18, 8, 11, 1);
-      g.fill(0x222233);
-      // Blue screen
-      g.roundRect(-3, -17, 6, 8, 1);
-      g.fill(0x4488cc);
+      // Larger tablet with bright glowing screen
+      g.roundRect(-5, -19, 10, 13, 2);
+      g.fill(0x111122);
+      // Bright screen with gradient-like glow
+      g.roundRect(-4, -18, 8, 10, 1);
+      g.fill(0x55aaff);
+      // Screen content lines
+      g.moveTo(-2, -16);
+      g.lineTo(2, -16);
+      g.stroke({ width: 1, color: 0xffffff, alpha: 0.5 });
+      g.moveTo(-2, -14);
+      g.lineTo(2, -14);
+      g.stroke({ width: 1, color: 0xffffff, alpha: 0.5 });
       break;
     }
     case 'chef-hat': {
       // Tall white toque sitting on head (head top at y=-35)
-      g.roundRect(-6, -47, 12, 13, 3);
+      g.roundRect(-7, -49, 14, 15, 4);
       g.fill(0xffffff);
       // Brim resting on head
-      g.roundRect(-7, -35, 14, 3, 1);
+      g.roundRect(-8, -35, 16, 3, 1);
       g.fill(0xf0f0f0);
       // White apron overlay on body
       g.roundRect(-6, -20, 12, 12, 1);
-      g.fill({ color: 0xffffff, alpha: 0.7 });
+      g.fill({ color: 0xffffff, alpha: 0.75 });
       break;
     }
     case 'headband': {
-      // Solid red filled band across the forehead (filled rect, not stroke)
-      g.roundRect(-8, -33, 16, 4, 1);
+      // Bright red band across forehead — taller for visibility
+      g.roundRect(-8, -34, 16, 5, 1);
       g.fill(0xff2222);
-      // Knot tails on right side
+      // Knot tails on right side — larger
       g.poly([
-        { x: 8, y: -33 },
-        { x: 12, y: -30 },
-        { x: 11, y: -31 },
-        { x: 12, y: -34 },
+        { x: 8, y: -34 },
+        { x: 14, y: -30 },
+        { x: 12, y: -31 },
+        { x: 14, y: -35 },
       ]);
       g.fill(0xdd1111);
       break;
     }
     case 'glasses-tie': {
-      // Glasses at eye level
-      g.circle(-3, -28, 2.5);
-      g.stroke({ width: 1.5, color: 0xaaaacc });
-      g.circle(3, -28, 2.5);
-      g.stroke({ width: 1.5, color: 0xaaaacc });
+      // Glasses — filled white lenses with colored frames
+      g.roundRect(-6, -30, 5, 4, 1);
+      g.fill({ color: 0xffffff, alpha: 0.3 });
+      g.roundRect(-6, -30, 5, 4, 1);
+      g.stroke({ width: 2, color: 0xddddff });
+      g.roundRect(1, -30, 5, 4, 1);
+      g.fill({ color: 0xffffff, alpha: 0.3 });
+      g.roundRect(1, -30, 5, 4, 1);
+      g.stroke({ width: 2, color: 0xddddff });
       // Bridge
-      g.moveTo(-0.5, -28);
-      g.lineTo(0.5, -28);
-      g.stroke({ width: 1.5, color: 0xaaaacc });
-      // Arms
-      g.moveTo(-5.5, -28);
-      g.lineTo(-7, -28);
-      g.stroke({ width: 1.5, color: 0xaaaacc });
-      g.moveTo(5.5, -28);
-      g.lineTo(7, -28);
-      g.stroke({ width: 1.5, color: 0xaaaacc });
-      // Red tie (narrower, centered on body)
+      g.moveTo(-1, -28);
+      g.lineTo(1, -28);
+      g.stroke({ width: 2, color: 0xddddff });
+      // Red tie — wider and more prominent
       g.poly([
-        { x: 0, y: -20 },
-        { x: -2, y: -16 },
-        { x: 0, y: -9 },
-        { x: 2, y: -16 },
+        { x: 0, y: -21 },
+        { x: -3, y: -16 },
+        { x: 0, y: -7 },
+        { x: 3, y: -16 },
       ]);
       g.fill(0xcc2222);
+      // Tie knot
+      g.circle(0, -20, 2);
+      g.fill(0xaa1111);
       break;
     }
     case 'backpack': {
-      // Green pack behind body — wider to peek out on sides
-      g.roundRect(-10, -21, 20, 15, 2);
-      g.fill(0x44aa66);
-      // Darker center panel
-      g.roundRect(-6, -19, 12, 10, 1);
-      g.fill(0x338855);
-      // Shoulder straps (visible on top of shirt)
-      g.moveTo(-5, -21);
-      g.lineTo(-5, -13);
-      g.stroke({ width: 2.5, color: 0x225533 });
-      g.moveTo(5, -21);
-      g.lineTo(5, -13);
-      g.stroke({ width: 2.5, color: 0x225533 });
+      // Green pack behind body — much wider to peek out clearly on sides
+      g.roundRect(-13, -23, 26, 18, 3);
+      g.fill(0x44bb66);
+      // Front pocket detail
+      g.roundRect(-8, -19, 16, 10, 2);
+      g.fill(0x339955);
+      // Shoulder straps visible on top of body
+      g.moveTo(-5, -22);
+      g.lineTo(-5, -12);
+      g.stroke({ width: 3, color: 0x227744 });
+      g.moveTo(5, -22);
+      g.lineTo(5, -12);
+      g.stroke({ width: 3, color: 0x227744 });
       // Top flap peeking above shoulders
-      g.roundRect(-7, -24, 14, 4, 1);
-      g.fill(0x338855);
+      g.roundRect(-9, -26, 18, 5, 2);
+      g.fill(0x339955);
       break;
     }
     case 'lanyard': {
-      // Bright blue V-shaped cord from neck (thicker, brighter)
-      g.moveTo(-3, -21);
-      g.bezierCurveTo(-4, -14, -1, -10, 0, -5);
-      g.stroke({ width: 2.5, color: 0x55aaff });
-      g.moveTo(3, -21);
-      g.bezierCurveTo(4, -14, 1, -10, 0, -5);
-      g.stroke({ width: 2.5, color: 0x55aaff });
-      // Larger white badge hanging at bottom
-      g.roundRect(-5, -6, 10, 8, 1);
+      // Bright blue V-shaped cord from neck down to mid-body
+      g.moveTo(-4, -21);
+      g.lineTo(0, -12);
+      g.stroke({ width: 3, color: 0x55bbff });
+      g.moveTo(4, -21);
+      g.lineTo(0, -12);
+      g.stroke({ width: 3, color: 0x55bbff });
+      // Large white badge on body (centered, above legs)
+      g.roundRect(-5, -13, 10, 8, 2);
       g.fill(0xf0f0f0);
       // Blue stripe on badge
-      g.roundRect(-4, -4, 8, 3, 0);
-      g.fill(0x55aaff);
+      g.roundRect(-4, -11, 8, 3, 0);
+      g.fill(0x55bbff);
+      // Name text line
+      g.moveTo(-3, -7);
+      g.lineTo(3, -7);
+      g.stroke({ width: 1, color: 0x888888 });
       break;
     }
     case 'none':

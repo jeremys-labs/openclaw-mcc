@@ -1,5 +1,5 @@
-export const TILE_WIDTH = 64;
-export const TILE_HEIGHT = 32;
+export const TILE_WIDTH = 96;
+export const TILE_HEIGHT = 48;
 
 export function isoToScreen(col: number, row: number): { x: number; y: number } {
   return {
