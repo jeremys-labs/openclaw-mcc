@@ -5,3 +5,6 @@ dist/
 *.db-wal
 *.db-shm
 .vite/
+dev-dist/
+playwright-report/
+test-results/
