@@ -14,6 +14,7 @@ export function FileReview() {
   const [dirPath, setDirPath] = useState('');
   const [entries, setEntries] = useState<DirEntry[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Review folder files (flat)
   const [reviewFiles, setReviewFiles] = useState<Record<string, string[]>>({
@@ -64,6 +65,8 @@ export function FileReview() {
   const selectDocFile = (name: string) => {
     const filePath = dirPath ? `${dirPath}/${name}` : name;
     setSelectedFile(filePath);
+    // Auto-collapse sidebar on mobile when a file is selected
+    if (window.innerWidth < 768) setSidebarOpen(false);
   };
 
   const moveFile = async (filename: string, from: string, to: string) => {
@@ -89,7 +92,7 @@ export function FileReview() {
   return (
     <div className="flex flex-col h-full">
       {/* Mode tabs */}
-      <div className="flex border-b border-white/10 shrink-0">
+      <div className="flex overflow-x-auto border-b border-white/10 shrink-0">
         {([
           { key: 'docs', label: 'Workspace Docs' },
           { key: 'inbox', label: 'Inbox' },
@@ -102,7 +105,7 @@ export function FileReview() {
               setMode(key);
               setSelectedFile(null);
             }}
-            className={`px-3 py-2 text-xs ${
+            className={`px-3 py-2 text-xs whitespace-nowrap ${
               mode === key ? 'bg-accent/20 text-accent' : 'text-text-secondary hover:text-text-primary'
             }`}
           >
@@ -112,9 +115,21 @@ export function FileReview() {
         ))}
       </div>
 
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-col md:flex-row flex-1 min-h-0">
+        {/* Sidebar toggle (mobile) */}
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="md:hidden flex items-center gap-2 px-3 py-2 border-b border-white/10 text-xs text-text-secondary hover:text-text-primary shrink-0"
+        >
+          <span className={`transition-transform ${sidebarOpen ? 'rotate-90' : ''}`}>▶</span>
+          {sidebarOpen ? 'Hide file list' : 'Show file list'}
+          {!sidebarOpen && selectedFile && (
+            <span className="ml-auto text-accent truncate max-w-[200px]">{selectedFile.split('/').pop()}</span>
+          )}
+        </button>
+
         {/* File list sidebar */}
-        <div className="w-64 border-r border-white/10 flex flex-col shrink-0">
+        <div className={`${sidebarOpen ? 'flex' : 'hidden'} md:flex w-full md:w-64 border-r border-white/10 flex-col shrink-0 ${sidebarOpen ? 'max-h-[40vh] md:max-h-none' : ''}`}>
           {mode === 'docs' && (
             <>
               {/* Breadcrumb */}
@@ -195,7 +210,10 @@ export function FileReview() {
               {currentReviewFiles.map((filename) => (
                 <button
                   key={filename}
-                  onClick={() => setSelectedFile(filename)}
+                  onClick={() => {
+                    setSelectedFile(filename);
+                    if (window.innerWidth < 768) setSidebarOpen(false);
+                  }}
                   className={`w-full text-left px-2 py-1.5 rounded text-sm truncate ${
                     selectedFile === filename ? 'bg-accent/20' : 'hover:bg-surface-overlay'
                   }`}
@@ -211,7 +229,7 @@ export function FileReview() {
         </div>
 
         {/* File content area */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 min-h-0">
           {selectedFile && fileUrl ? (
             <div className="flex flex-col h-full">
               <div className="p-3 border-b border-white/10 flex items-center gap-2">
