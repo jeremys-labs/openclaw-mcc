@@ -78,6 +78,9 @@ export function ChatPanel({ agentKey }: Props) {
             <div className="text-sm font-semibold">{agent?.name}</div>
             <div className="text-xs text-text-secondary">{agent?.role}</div>
           </div>
+          {agent?.model && (
+            <span className="ml-auto text-xs text-text-secondary">{agent.model}</span>
+          )}
         </div>
       </div>
 

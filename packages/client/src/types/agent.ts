@@ -28,6 +28,7 @@ export interface AgentConfig {
   greeting: string;
   quote?: string;
   voice?: string;
+  model?: string;
   position: AgentPosition;
   tabs: AgentTab[];
 }
