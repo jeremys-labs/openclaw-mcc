@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { loadConfig, resolveContentRoot } from './config.js';
 import { ensureContentDirs } from './content.js';
+import { loadAgentModels } from './models.js';
 import { createChatDB } from './db.js';
 import { GatewayClient } from './gateway/client.js';
 import { ChatStreamService } from './services/chat-streaming.js';
@@ -22,6 +23,16 @@ const PORT = parseInt(process.env.SERVER_PORT || '8081', 10);
 const contentRoot = resolveContentRoot();
 const config = loadConfig(contentRoot);
 ensureContentDirs(contentRoot);
+
+// Resolve agent models from openclaw.json
+const agentModels = loadAgentModels(contentRoot, Object.keys(config.agents));
+
+// Inject model into each agent config
+for (const [key, model] of Object.entries(agentModels)) {
+  if (config.agents[key] && model) {
+    config.agents[key].model = model;
+  }
+}
 
 // Database
 const dbPath = path.join(contentRoot, 'databases', 'chat.db');
