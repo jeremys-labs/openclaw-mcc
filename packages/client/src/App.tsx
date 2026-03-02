@@ -18,7 +18,9 @@ export default function App() {
   const activeView = useUIStore((s) => s.activeView);
   const activeAgent = useUIStore((s) => s.activeAgent);
   const panelOpen = useUIStore((s) => s.panelOpen);
+  const panelExpanded = useUIStore((s) => s.panelExpanded);
   const closePanel = useUIStore((s) => s.closePanel);
+  const togglePanelExpanded = useUIStore((s) => s.togglePanelExpanded);
   const loading = useAgentStore((s) => s.loading);
   const error = useAgentStore((s) => s.error);
   const setGatewayStatus = useConnectionStore((s) => s.setGatewayStatus);
@@ -118,8 +120,10 @@ export default function App() {
                 'h-[85vh] rounded-t-2xl',
                 'transition-transform duration-300 ease-out',
                 // Desktop: static sidebar
-                'md:static md:inset-auto md:z-auto md:w-96 md:h-auto md:rounded-none',
+                'md:static md:inset-auto md:z-auto md:h-auto md:rounded-none',
                 'md:border-l md:border-white/10 md:shrink-0',
+                'md:transition-[width] md:duration-200 md:ease-out',
+                panelExpanded ? 'md:w-[48rem]' : 'md:w-96',
               ].join(' ')}
             >
               {/* Mobile drag handle */}
@@ -127,6 +131,13 @@ export default function App() {
                 <div className="w-10 h-1 rounded-full bg-white/20" />
               </div>
               <div className="flex border-b border-white/10">
+                <button
+                  onClick={togglePanelExpanded}
+                  className="hidden md:block px-3 py-2 text-xs text-text-secondary hover:text-text-primary"
+                  title={panelExpanded ? 'Collapse panel' : 'Expand panel'}
+                >
+                  {panelExpanded ? '\u25B6' : '\u25C0'}
+                </button>
                 <button
                   onClick={() => closePanel()}
                   className="ml-auto px-3 py-2 text-xs text-text-secondary hover:text-text-primary"

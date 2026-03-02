@@ -97,6 +97,9 @@ gateway.on('event', (frame: Record<string, unknown>) => {
 
 gateway.on('state', (state: string) => {
   console.log(`[Gateway] State: ${state}`);
+  if (state === 'disconnected') {
+    streaming.broadcastErrorToAll('Gateway disconnected — response interrupted');
+  }
 });
 
 gateway.on('error', (err: Error) => {

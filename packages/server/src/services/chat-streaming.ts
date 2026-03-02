@@ -67,6 +67,13 @@ export class ChatStreamService extends EventEmitter {
     this.broadcast(agent, 'context.update', { tokens, maxTokens, percentUsed });
   }
 
+  /** Broadcast an error to all agents with active subscribers (e.g. on gateway disconnect). */
+  broadcastErrorToAll(error: string): void {
+    for (const agentKey of this.subscribers.keys()) {
+      this.broadcast(agentKey, 'message.error', { messageId: '', error });
+    }
+  }
+
   getSubscriberCount(agent: string): number {
     return this.subscribers.get(agent)?.size ?? 0;
   }
