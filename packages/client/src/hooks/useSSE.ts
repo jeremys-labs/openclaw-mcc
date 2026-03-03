@@ -8,16 +8,36 @@ export function useSSE(agentKey: string | null) {
   const eventSourceRef = useRef<EventSource | null>(null);
   const retryCountRef = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasConnectedRef = useRef(false);
   const appendStreamBuffer = useChatStore((s) => s.appendStreamBuffer);
   const finalizeStream = useChatStore((s) => s.finalizeStream);
   const setStreaming = useChatStore((s) => s.setStreaming);
+  const setMessages = useChatStore((s) => s.setMessages);
 
   useEffect(() => {
     if (!agentKey) return;
 
+    // Reload chat history from DB to catch any messages missed during SSE downtime
+    async function reloadHistory() {
+      try {
+        const res = await fetch(`/api/chat-history/${agentKey}`);
+        const messages = await res.json();
+        setMessages(agentKey!, messages);
+      } catch { /* ignore, will retry on next reconnect */ }
+    }
+
     function connect() {
       const es = new EventSource(`/api/chat-stream/${agentKey}`);
       eventSourceRef.current = es;
+
+      es.addEventListener('connected', () => {
+        // On reconnect (not first connect), reload history to catch missed messages
+        if (hasConnectedRef.current) {
+          reloadHistory();
+        }
+        hasConnectedRef.current = true;
+        retryCountRef.current = 0;
+      });
 
       es.addEventListener('message.delta', (e) => {
         const data = JSON.parse(e.data);
@@ -68,6 +88,7 @@ export function useSSE(agentKey: string | null) {
     connect();
 
     return () => {
+      hasConnectedRef.current = false;
       if (retryTimerRef.current) {
         clearTimeout(retryTimerRef.current);
         retryTimerRef.current = null;
@@ -77,5 +98,5 @@ export function useSSE(agentKey: string | null) {
         eventSourceRef.current = null;
       }
     };
-  }, [agentKey, appendStreamBuffer, finalizeStream, setStreaming]);
+  }, [agentKey, appendStreamBuffer, finalizeStream, setStreaming, setMessages]);
 }

@@ -2,9 +2,12 @@ import { EventEmitter } from 'events';
 import type { Response } from 'express';
 import type { SSEEventType } from '../types/chat.js';
 
+const HEARTBEAT_INTERVAL_MS = 30_000;
+
 interface Subscriber {
   res: Response;
   agentKey: string;
+  heartbeat: ReturnType<typeof setInterval>;
 }
 
 export class ChatStreamService extends EventEmitter {
@@ -18,7 +21,12 @@ export class ChatStreamService extends EventEmitter {
       'X-Accel-Buffering': 'no',
     });
 
-    const subscriber: Subscriber = { res, agentKey };
+    // Periodic heartbeat to keep connection alive through proxies/browsers
+    const heartbeat = setInterval(() => {
+      try { res.write(':heartbeat\n\n'); } catch { /* connection dead, close handler cleans up */ }
+    }, HEARTBEAT_INTERVAL_MS);
+
+    const subscriber: Subscriber = { res, agentKey, heartbeat };
 
     if (!this.subscribers.has(agentKey)) {
       this.subscribers.set(agentKey, new Set());
@@ -30,6 +38,7 @@ export class ChatStreamService extends EventEmitter {
 
     // Clean up on close
     res.on('close', () => {
+      clearInterval(subscriber.heartbeat);
       const subs = this.subscribers.get(agentKey);
       if (subs) {
         subs.delete(subscriber);

@@ -8,6 +8,7 @@ interface RawUpdate {
   status?: string;
   workingOn?: string[] | string;
   working_on?: string[] | string;
+  completed?: string[] | string;
   blockers?: string | string[];
   learned?: string | string[] | null;
   notes?: string;
@@ -20,11 +21,14 @@ interface NormalizedAgent {
   learned?: string;
 }
 
-function normalizeStatus(raw: string | undefined): 'completed' | 'pending' | 'blocked' {
-  if (!raw) return 'pending';
-  const lower = raw.toLowerCase();
-  if (['blocked', 'critical'].some((s) => lower.includes(s))) return 'blocked';
-  if (['green', 'deployed', 'completed', 'done', 'ready'].some((s) => lower.includes(s))) return 'completed';
+function normalizeStatus(raw: string | undefined, hasContent: boolean): 'completed' | 'pending' | 'blocked' {
+  if (raw) {
+    const lower = raw.toLowerCase();
+    if (['blocked', 'critical'].some((s) => lower.includes(s))) return 'blocked';
+    if (['green', 'deployed', 'completed', 'done', 'ready'].some((s) => lower.includes(s))) return 'completed';
+  }
+  // Agent submitted working_on/completed data but no explicit status → completed
+  if (hasContent) return 'completed';
   return 'pending';
 }
 
@@ -63,9 +67,10 @@ export function createStandupRoutes(contentRoot: string): Router {
           const workingOn = toStringList(u.workingOn || u.working_on);
           const blockers = toStringList(u.blockers);
           const learned = toStringList(u.learned);
+          const hasContent = !!(workingOn || u.completed);
 
           agents[u.agent] = {
-            status: normalizeStatus(u.status),
+            status: normalizeStatus(u.status, hasContent),
             today: workingOn || undefined,
             blockers: blockers && blockers.toLowerCase() !== 'none' ? blockers : undefined,
             learned: learned || undefined,

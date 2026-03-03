@@ -4,7 +4,11 @@ import { useAgentStore } from '../stores/agentStore';
 
 function formatStandupDate(raw: string | null): string {
   if (!raw) return 'No data';
-  const parsed = new Date(raw);
+  // Parse YYYY-MM-DD as local time (new Date("2026-03-02") parses as UTC, causing off-by-one)
+  const parts = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const parsed = parts
+    ? new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]))
+    : new Date(raw);
   if (isNaN(parsed.getTime())) return raw;
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -32,7 +36,7 @@ export function StandupWidget() {
 
   return (
     <div className="bg-surface-raised rounded-lg border border-white/10 p-3">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between gap-2 mb-2">
         <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Standup</h3>
         <span className="text-xs text-text-secondary">{formatStandupDate(date)}</span>
       </div>
