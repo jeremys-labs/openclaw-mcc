@@ -241,9 +241,6 @@ function correctTranscript(raw: string): string {
   // Collapse repeated short phrases (2-4 words)
   text = text.replace(/\b((?:\w+\s+){1,3}\w+)(\s+\1){1,3}\b/gi, '$1');
 
-  // Fix Isla misrecognitions
-  text = text.replace(/\b(ila|eila|ayla|eye-?la|isla)\b/gi, 'Isla');
-
   return text.trim();
 }
 
