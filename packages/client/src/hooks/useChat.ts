@@ -44,6 +44,16 @@ export function useChat(agentKey: string) {
       if (!res.ok) {
         throw new Error(`Server responded with ${res.status}`);
       }
+      // Safety net: if SSE missed the response (e.g. mobile browser suspended the
+      // connection while keyboard was open), reload history from the DB after a delay.
+      // The deduplicate logic in the store prevents double-rendering if SSE worked fine.
+      setTimeout(async () => {
+        try {
+          const histRes = await fetch(`/api/chat-history/${agentKey}`);
+          const messages = await histRes.json();
+          useChatStore.getState().setMessages(agentKey, messages);
+        } catch { /* ignore */ }
+      }, 5000);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to send message';
       addMessage(agentKey, {

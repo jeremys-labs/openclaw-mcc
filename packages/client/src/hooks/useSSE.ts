@@ -31,10 +31,10 @@ export function useSSE(agentKey: string | null) {
       eventSourceRef.current = es;
 
       es.addEventListener('connected', () => {
-        // On reconnect (not first connect), reload history to catch missed messages
-        if (hasConnectedRef.current) {
-          reloadHistory();
-        }
+        // Reload history on every connect (including first) to catch any missed messages.
+        // On mobile (especially iPad over Tailscale), the SSE can silently drop during
+        // keyboard open/close or network transitions, causing the first response to be lost.
+        reloadHistory();
         hasConnectedRef.current = true;
         retryCountRef.current = 0;
       });
