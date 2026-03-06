@@ -129,7 +129,7 @@ app.use('/api', createChatRouter({ config, db, gateway, streaming }));
 app.use('/api', createFileRoutes(contentRoot));
 app.use('/api', createStandupRoutes(contentRoot));
 app.use('/api', createChannelRoutes(contentRoot));
-app.use('/api', createAgentDataRoutes(config, contentRoot));
+app.use('/api', createAgentDataRoutes(config, contentRoot, gateway));
 app.use('/api', createVoiceRouter(config));
 
 // Serve built client (production)

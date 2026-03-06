@@ -2,11 +2,138 @@ import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 import type { AppConfig } from '../types/config.js';
+import type { GatewayClient } from '../gateway/client.js';
 
-export function createAgentDataRoutes(config: AppConfig, contentRoot: string): Router {
+// ---------------------------------------------------------------------------
+// Cron data types (subset of what gateway returns)
+// ---------------------------------------------------------------------------
+
+interface CronSchedule {
+  kind: string;
+  expr?: string;
+  tz?: string;
+  everyMs?: number;
+}
+
+interface CronState {
+  nextRunAtMs?: number;
+  lastRunAtMs?: number;
+  lastStatus?: string;
+  consecutiveErrors?: number;
+}
+
+interface CronJob {
+  id: string;
+  agentId: string;
+  name: string;
+  enabled: boolean;
+  schedule: CronSchedule;
+  state?: CronState;
+}
+
+interface CronListResponse {
+  jobs: CronJob[];
+}
+
+// ---------------------------------------------------------------------------
+// Schedule formatting helpers
+// ---------------------------------------------------------------------------
+
+function formatSchedule(schedule: CronSchedule): string {
+  if (schedule.kind === 'cron') {
+    return formatCronExpression(schedule.expr || '', schedule.tz);
+  }
+  if (schedule.kind === 'every' && schedule.everyMs) {
+    return formatEvery(schedule.everyMs);
+  }
+  return schedule.kind;
+}
+
+function formatEvery(ms: number): string {
+  if (ms < 60_000) return `Every ${Math.round(ms / 1000)}s`;
+  if (ms < 3_600_000) return `Every ${Math.round(ms / 60_000)}m`;
+  if (ms < 86_400_000) return `Every ${Math.round(ms / 3_600_000)}h`;
+  return `Every ${Math.round(ms / 86_400_000)}d`;
+}
+
+// Very lightweight cron expression → human-readable description
+function formatCronExpression(expr: string, tz?: string): string {
+  const parts = expr.trim().split(/\s+/);
+  if (parts.length < 5) return expr;
+
+  const [min, hour, dom, , dow] = parts;
+  const tzLabel = tz ? ` (${tz.replace('America/', '')})` : '';
+
+  // Every day at HH:MM
+  if (dom === '*' && dow === '*' && /^\d+$/.test(hour) && /^\d+$/.test(min)) {
+    const h = parseInt(hour, 10);
+    const m = parseInt(min, 10);
+    const ampm = h >= 12 ? 'pm' : 'am';
+    const h12 = h % 12 || 12;
+    const mStr = m === 0 ? '' : `:${String(m).padStart(2, '0')}`;
+    return `Daily at ${h12}${mStr}${ampm}${tzLabel}`;
+  }
+
+  // Weekdays at HH:MM (1-5)
+  if (dow === '1-5' && /^\d+$/.test(hour) && /^\d+$/.test(min)) {
+    const h = parseInt(hour, 10);
+    const m = parseInt(min, 10);
+    const ampm = h >= 12 ? 'pm' : 'am';
+    const h12 = h % 12 || 12;
+    const mStr = m === 0 ? '' : `:${String(m).padStart(2, '0')}`;
+    return `Weekdays at ${h12}${mStr}${ampm}${tzLabel}`;
+  }
+
+  // Specific weekday at HH:MM
+  const DOW_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  if (/^\d$/.test(dow) && /^\d+$/.test(hour) && /^\d+$/.test(min)) {
+    const h = parseInt(hour, 10);
+    const m = parseInt(min, 10);
+    const ampm = h >= 12 ? 'pm' : 'am';
+    const h12 = h % 12 || 12;
+    const mStr = m === 0 ? '' : `:${String(m).padStart(2, '0')}`;
+    const dayName = DOW_NAMES[parseInt(dow, 10)] || `day ${dow}`;
+    return `${dayName}s at ${h12}${mStr}${ampm}${tzLabel}`;
+  }
+
+  return `${expr}${tzLabel}`;
+}
+
+function formatRelativeTime(ms: number): string {
+  const diffMs = Date.now() - ms;
+  const abs = Math.abs(diffMs);
+  const future = diffMs < 0;
+
+  if (abs < 60_000) return future ? 'in < 1m' : '< 1m ago';
+  if (abs < 3_600_000) {
+    const m = Math.round(abs / 60_000);
+    return future ? `in ${m}m` : `${m}m ago`;
+  }
+  if (abs < 86_400_000) {
+    const h = Math.round(abs / 3_600_000);
+    return future ? `in ${h}h` : `${h}h ago`;
+  }
+  const d = Math.round(abs / 86_400_000);
+  return future ? `in ${d}d` : `${d}d ago`;
+}
+
+// Map gateway status to a card-compatible status string
+function mapStatus(job: CronJob): string {
+  if (!job.enabled) return 'disabled';
+  const s = job.state?.lastStatus;
+  if (!s || s === 'ok') return 'active';
+  if (s === 'error') return 'error';
+  return s;
+}
+
+// ---------------------------------------------------------------------------
+// Route factory
+// ---------------------------------------------------------------------------
+
+export function createAgentDataRoutes(config: AppConfig, contentRoot: string, gateway?: GatewayClient): Router {
   const router = Router();
 
-  router.get('/agent-data/:agentKey/:tabId', (req, res) => {
+  router.get('/agent-data/:agentKey/:tabId', async (req, res) => {
     const { agentKey, tabId } = req.params;
     const agent = config.agents[agentKey as string];
     if (!agent) { res.status(404).json({ error: 'Agent not found' }); return; }
@@ -16,6 +143,9 @@ export function createAgentDataRoutes(config: AppConfig, contentRoot: string): R
 
     const source = tab.source;
 
+    // ------------------------------------------------------------------
+    // source: file:<name>
+    // ------------------------------------------------------------------
     if (source.startsWith('file:')) {
       const fileName = source.slice(5);
       const baseName = fileName.replace(/\.[^.]+$/, '');
@@ -52,6 +182,9 @@ export function createAgentDataRoutes(config: AppConfig, contentRoot: string): R
       return;
     }
 
+    // ------------------------------------------------------------------
+    // source: about
+    // ------------------------------------------------------------------
     if (source === 'about') {
       const aboutPath = path.join(contentRoot, 'workspace', 'agents', agentKey as string, 'about.md');
       if (fs.existsSync(aboutPath)) {
@@ -71,12 +204,57 @@ export function createAgentDataRoutes(config: AppConfig, contentRoot: string): R
       return;
     }
 
+    // ------------------------------------------------------------------
+    // source: memory
+    // ------------------------------------------------------------------
     if (source === 'memory') {
       const memPath = path.join(contentRoot, 'memory', 'agents', `${agentKey}.md`);
       if (fs.existsSync(memPath)) {
         res.type('text/plain').send(fs.readFileSync(memPath, 'utf-8'));
       } else {
         res.type('text/plain').send('');
+      }
+      return;
+    }
+
+    // ------------------------------------------------------------------
+    // source: crons
+    // Fetches scheduled jobs for this agent from the gateway.
+    // ------------------------------------------------------------------
+    if (source === 'crons') {
+      if (!gateway || !gateway.isConnected) {
+        res.json([]);
+        return;
+      }
+
+      try {
+        const result = await gateway.request('cron.list', {
+          query: agentKey as string,
+          limit: 50,
+        }) as CronListResponse | null;
+
+        const jobs: CronJob[] = result?.jobs ?? [];
+
+        // Filter to this agent only (query is a text search, not a strict filter)
+        const agentJobs = jobs.filter((j) => j.agentId === agentKey);
+
+        // Shape each job into a card-friendly object
+        const cards = agentJobs.map((job) => ({
+          id: job.id.slice(0, 8),        // Short ID for display
+          name: job.name,
+          status: mapStatus(job),
+          schedule: formatSchedule(job.schedule),
+          ...(job.state?.nextRunAtMs ? { next: formatRelativeTime(job.state.nextRunAtMs) } : {}),
+          ...(job.state?.lastRunAtMs ? { last: formatRelativeTime(job.state.lastRunAtMs) } : {}),
+          ...(job.state?.consecutiveErrors && job.state.consecutiveErrors > 0
+            ? { errors: job.state.consecutiveErrors }
+            : {}),
+        }));
+
+        res.json(cards);
+      } catch (err) {
+        console.error('[agent-data] cron.list error:', err);
+        res.json([]);
       }
       return;
     }

@@ -227,8 +227,40 @@ export function AgentInfoTabs({ agentKey }: Props) {
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [tabData, setTabData] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
+  // Track which cron-sourced tabs have been pre-fetched and returned empty.
+  // null = still checking, Set = resolved
+  const [emptyCronTabs, setEmptyCronTabs] = useState<Set<string> | null>(null);
 
-  const tabs = agent?.tabs || [];
+  const allTabs = agent?.tabs || [];
+  const cronTabs = allTabs.filter((t) => t.source === 'crons');
+
+  // Pre-fetch all cron tabs on mount/agent change to know upfront which are empty
+  useEffect(() => {
+    setEmptyCronTabs(null);
+    setActiveTab(null);
+    setTabData(null);
+
+    if (cronTabs.length === 0) {
+      setEmptyCronTabs(new Set());
+      return;
+    }
+
+    Promise.all(
+      cronTabs.map((t) =>
+        fetch(`/api/agent-data/${agentKey}/${t.id}`)
+          .then((r) => r.json())
+          .then((data) => ({ id: t.id, empty: Array.isArray(data) && data.length === 0 }))
+          .catch(() => ({ id: t.id, empty: false }))
+      )
+    ).then((results) => {
+      setEmptyCronTabs(new Set(results.filter((r) => r.empty).map((r) => r.id)));
+    });
+  }, [agentKey]);
+
+  // Filter out cron tabs confirmed empty; show all others (including unresolved)
+  const tabs = emptyCronTabs === null
+    ? allTabs.filter((t) => t.source !== 'crons')   // still loading: hide cron tabs temporarily
+    : allTabs.filter((t) => t.source !== 'crons' || !emptyCronTabs.has(t.id));
 
   useEffect(() => {
     if (tabs.length > 0 && !activeTab) setActiveTab(tabs[0].id);
