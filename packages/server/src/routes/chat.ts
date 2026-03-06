@@ -116,16 +116,21 @@ export function createChatRouter({ config, db, gateway, streaming }: ChatDeps): 
 
     const sessionKey = `agent:${agentKey}:webchat:user`;
 
+    // Always broadcast abort to the UI so the streaming state clears,
+    // even if the gateway call fails (method unsupported, timeout, etc.)
+    let gatewayOk = false;
     try {
       if (gateway.isConnected) {
         await gateway.request('chat.interrupt', { sessionKey });
+        gatewayOk = true;
       }
-      streaming.broadcastAbort(agentKey, '', 'User interrupted');
-      res.json({ interrupted: true });
     } catch (err) {
-      console.error(`Interrupt failed for ${agentKey}:`, err);
-      res.status(502).json({ error: 'Gateway interrupt failed' });
+      console.error(`Gateway interrupt failed for ${agentKey}:`, (err as Error).message);
     }
+
+    // Always clear streaming state on the client
+    streaming.broadcastAbort(agentKey, '', 'User interrupted');
+    res.json({ interrupted: true, gatewayAck: gatewayOk });
   });
 
   return router;

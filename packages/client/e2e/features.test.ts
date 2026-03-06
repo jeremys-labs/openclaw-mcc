@@ -248,11 +248,11 @@ test.describe('Chat — Duplicate Prevention', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Channels View
+// Channels View (Coming Soon placeholder)
 // ---------------------------------------------------------------------------
 
 test.describe('Channels View', () => {
-  test('displays channel list with agent names and emoji', async ({ page }) => {
+  test('displays Coming Soon placeholder', async ({ page }) => {
     await mockApiRoutes(page);
     await page.goto('/');
     await expect(page.locator('text=Loading...')).not.toBeVisible({ timeout: 5000 });
@@ -262,35 +262,7 @@ test.describe('Channels View', () => {
     await channelsBtn.click();
 
     await expect(page.locator('text=Agent Channels')).toBeVisible();
-    await expect(page.locator('text=Isla & Kael')).toBeVisible();
-  });
-
-  test('clicking a channel shows messages', async ({ page }) => {
-    await mockApiRoutes(page);
-    await page.goto('/');
-    await expect(page.locator('text=Loading...')).not.toBeVisible({ timeout: 5000 });
-
-    const channelsBtn = page.locator('header nav button', { hasText: 'channels' });
-    await channelsBtn.click();
-
-    // Click the channel
-    await page.locator('text=Isla & Kael').click();
-
-    // Messages should appear
-    await expect(page.locator('text=Sprint planning sync')).toBeVisible();
-    await expect(page.locator('text=API schema review needed')).toBeVisible();
-    await expect(page.locator('text=Schema approved')).toBeVisible();
-  });
-
-  test('shows empty state when no channels', async ({ page }) => {
-    await mockApiRoutes(page, { channels: { recent: [] } });
-    await page.goto('/');
-    await expect(page.locator('text=Loading...')).not.toBeVisible({ timeout: 5000 });
-
-    const channelsBtn = page.locator('header nav button', { hasText: 'channels' });
-    await channelsBtn.click();
-
-    await expect(page.locator('text=No interactions yet')).toBeVisible();
+    await expect(page.locator('text=Coming Soon')).toBeVisible();
   });
 });
 
@@ -331,7 +303,7 @@ test.describe('Mobile Layout', () => {
     await expect(aside.locator('.rounded-full.bg-white\\/20')).toBeVisible();
   });
 
-  test('channels view shows full-width list on mobile', async ({ page }) => {
+  test('channels view shows Coming Soon on mobile', async ({ page }) => {
     await mockApiRoutes(page);
     await page.goto('/');
     await expect(page.locator('text=Loading...')).not.toBeVisible({ timeout: 5000 });
@@ -341,23 +313,7 @@ test.describe('Mobile Layout', () => {
     await channelsBtn.click();
 
     await expect(page.locator('text=Agent Channels')).toBeVisible();
-    await expect(page.locator('text=Isla & Kael')).toBeVisible();
-  });
-
-  test('channels mobile: selecting channel shows detail with back button', async ({ page }) => {
-    await mockApiRoutes(page);
-    await page.goto('/');
-    await expect(page.locator('text=Loading...')).not.toBeVisible({ timeout: 5000 });
-
-    const channelsBtn = page.locator('nav.fixed button', { hasText: 'channels' });
-    await channelsBtn.click();
-
-    await page.locator('text=Isla & Kael').click();
-
-    // Back button should be visible on mobile
-    await expect(page.locator('text=All channels')).toBeVisible();
-    // Messages should be visible
-    await expect(page.locator('text=Sprint planning sync')).toBeVisible();
+    await expect(page.locator('text=Coming Soon')).toBeVisible();
   });
 
   test('standup widget fits within mobile viewport', async ({ page }) => {
@@ -413,7 +369,7 @@ test.describe('iPad Layout', () => {
     await expect(dragHandle).not.toBeVisible();
   });
 
-  test('channels view shows two-column layout on iPad', async ({ page }) => {
+  test('channels view shows Coming Soon on iPad', async ({ page }) => {
     await mockApiRoutes(page);
     await page.goto('/');
     await expect(page.locator('text=Loading...')).not.toBeVisible({ timeout: 5000 });
@@ -421,15 +377,8 @@ test.describe('iPad Layout', () => {
     const channelsBtn = page.locator('header nav button', { hasText: 'channels' });
     await channelsBtn.click();
 
-    // Click a channel
-    await page.locator('text=Isla & Kael').click();
-
-    // Both sidebar and detail should be visible simultaneously
     await expect(page.locator('text=Agent Channels')).toBeVisible();
-    await expect(page.locator('text=Sprint planning sync')).toBeVisible();
-
-    // Back button should NOT be visible on desktop/iPad
-    await expect(page.locator('text=All channels')).not.toBeVisible();
+    await expect(page.locator('text=Coming Soon')).toBeVisible();
   });
 });
 

@@ -60,7 +60,8 @@ export const useChatStore = create<ChatState>((set) => ({
     })),
   finalizeStream: (agent, content) =>
     set((s) => {
-      if (SYSTEM_MSG_RE.test(content.trim())) {
+      // Skip adding empty or system messages — just clear streaming state
+      if (!content.trim() || SYSTEM_MSG_RE.test(content.trim())) {
         return { streaming: { ...s.streaming, [agent]: false }, streamBuffer: { ...s.streamBuffer, [agent]: '' } };
       }
       const existing = s.messages[agent] || [];

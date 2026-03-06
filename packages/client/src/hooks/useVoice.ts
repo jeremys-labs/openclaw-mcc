@@ -35,10 +35,11 @@ export function useVoice() {
   const checkVoiceStatus = useCallback(async () => {
     try {
       const res = await fetch('/api/voice/status');
-      const data = await res.json();
-      const available = Boolean(data.whisperServer);
-      setVoiceAvailable(available);
-      return available;
+      if (!res.ok) throw new Error('Voice status check failed');
+      await res.json(); // validate response is JSON
+      // Voice is always available: Edge TTS fallback for TTS, whisper-cli fallback for STT
+      setVoiceAvailable(true);
+      return true;
     } catch {
       setVoiceAvailable(false);
       return false;

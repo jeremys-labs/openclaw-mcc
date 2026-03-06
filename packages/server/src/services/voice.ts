@@ -86,10 +86,16 @@ export function stopHealthChecks(): void {
 export function getVoiceStatus(): {
   whisperServer: boolean;
   kokoro: boolean;
+  edgeTts: boolean;
+  sttAvailable: boolean;
+  ttsAvailable: boolean;
 } {
   return {
     whisperServer: whisperServerAvailable,
     kokoro: kokoroAvailable,
+    edgeTts: true, // Edge TTS is always available (no local server needed)
+    sttAvailable: true, // whisper-cli fallback always available
+    ttsAvailable: true, // kokoro or Edge TTS fallback always available
   };
 }
 
