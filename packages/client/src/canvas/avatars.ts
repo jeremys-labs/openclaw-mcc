@@ -2,7 +2,7 @@ import { createAvatar } from '@dicebear/core';
 import * as pixelArt from '@dicebear/pixel-art';
 import { Assets, Texture } from 'pixi.js';
 import type { Options } from '@dicebear/pixel-art';
-import type { AgentConfig } from '../types/agent';
+import type { AgentAvatar, AgentConfig } from '../types/agent';
 
 // ---------------------------------------------------------------------------
 // Role → DiceBear options mapping
@@ -39,23 +39,31 @@ function roleToDiceBearOpts(role: string): Partial<Options> {
 }
 
 // ---------------------------------------------------------------------------
+// Options merge
+// ---------------------------------------------------------------------------
+
+export function buildAvatarOptions(role: string, avatar: AgentAvatar | undefined): Partial<Options> {
+  return { ...roleToDiceBearOpts(role), ...avatar } as Partial<Options>;
+}
+
+// ---------------------------------------------------------------------------
 // SVG generation
 // ---------------------------------------------------------------------------
 
-function generateAvatarSvg(agentKey: string, role: string, colorHex: string): string {
+function generateAvatarSvg(agentKey: string, role: string, colorHex: string, avatar?: AgentAvatar): string {
   const cleanColor = colorHex.startsWith('#') ? colorHex.slice(1) : colorHex;
-  const roleOpts = roleToDiceBearOpts(role);
+  const merged = buildAvatarOptions(role, avatar);
 
-  const avatar = createAvatar(pixelArt, {
+  const avatar_ = createAvatar(pixelArt, {
     seed: agentKey,
     size: 128,
     backgroundColor: ['transparent'],
     clothingColor: [cleanColor],
     mouth: ['happy01', 'happy02', 'happy03', 'happy04', 'happy05'],
-    ...roleOpts,
+    ...merged,
   });
 
-  return avatar.toString();
+  return avatar_.toString();
 }
 
 // ---------------------------------------------------------------------------
@@ -69,11 +77,12 @@ export async function loadAvatarTexture(
   key: string,
   role: string,
   colorHex: string,
+  avatar?: AgentAvatar,
 ): Promise<Texture> {
   const cached = textureCache.get(key);
   if (cached) return cached;
 
-  const svg = generateAvatarSvg(key, role, colorHex);
+  const svg = generateAvatarSvg(key, role, colorHex, avatar);
   const blob = new Blob([svg], { type: 'image/svg+xml' });
   const url = URL.createObjectURL(blob);
   blobUrls.push(url);
@@ -96,7 +105,7 @@ export async function preloadAllAvatars(
   const entries = Object.entries(agents);
   await Promise.all(
     entries.map(([key, agent]) =>
-      loadAvatarTexture(key, agent.role, agent.color.from),
+      loadAvatarTexture(key, agent.role, agent.color.from, agent.avatar),
     ),
   );
   return textureCache;

@@ -17,6 +17,21 @@ export interface AgentPosition {
   y: number;
 }
 
+export interface AgentAvatar {
+  hair?: string[];
+  hairColor?: string[];
+  beard?: string[];
+  beardProbability?: number;
+  glasses?: string[];
+  glassesProbability?: number;
+  hat?: string[];
+  hatProbability?: number;
+  accessories?: string[];
+  accessoriesProbability?: number;
+  clothing?: string[];
+  skinColor?: string[];
+}
+
 export interface AgentConfig {
   name: string;
   fullName?: string;
@@ -31,4 +46,5 @@ export interface AgentConfig {
   model?: string;
   position: AgentPosition;
   tabs: AgentTab[];
+  avatar?: AgentAvatar;
 }
