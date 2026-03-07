@@ -30,102 +30,142 @@ function isTextFile(filename: string): boolean {
   return ['md', 'txt', 'json', 'html', 'ts', 'tsx', 'js', 'jsx', 'py', 'sh', 'yaml', 'yml', 'toml', 'csv'].includes(ext);
 }
 
+const PRINT_STYLE_ID = 'mcc-print-styles';
+const PRINT_FRAME_ID = 'mcc-print-frame';
+
+/**
+ * In-page print: injects a hidden div + @media print stylesheet into the
+ * current document so the app UI disappears and only the file content
+ * prints. Works in iOS Safari PWA (no pop-up required).
+ */
+async function inPagePrint(url: string, filename: string, content?: string) {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+
+  // Fetch content
+  let text = content;
+  if (!text) {
+    try {
+      const res = await fetch(url);
+      text = await res.text();
+    } catch {
+      text = '(Unable to load file content)';
+    }
+  }
+
+  const escapedContent = (text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  // Inject print stylesheet — hides everything except #mcc-print-frame
+  const styleEl = document.createElement('style');
+  styleEl.id = PRINT_STYLE_ID;
+  styleEl.textContent = `
+    @media print {
+      body > *:not(#${PRINT_FRAME_ID}) { display: none !important; }
+      #${PRINT_FRAME_ID} {
+        display: block !important;
+        position: fixed;
+        inset: 0;
+        background: #fff;
+        color: #000;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-size: 12pt;
+        line-height: 1.6;
+        padding: 0.75in;
+        z-index: 99999;
+        overflow: visible;
+      }
+      .mcc-print-filename {
+        font-size: 9pt;
+        color: #666;
+        margin-bottom: 14pt;
+        border-bottom: 1pt solid #ddd;
+        padding-bottom: 6pt;
+      }
+      .mcc-print-body {
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-family: ${ext === 'json' || ext === 'ts' || ext === 'js' || ext === 'py' ? "'Courier New', monospace" : 'inherit'};
+        font-size: ${ext === 'json' || ext === 'ts' || ext === 'js' || ext === 'py' ? '10pt' : '12pt'};
+      }
+    }
+    @media screen {
+      #${PRINT_FRAME_ID} { display: none !important; }
+    }
+  `;
+  document.head.appendChild(styleEl);
+
+  // Inject print content div directly into body
+  const frameEl = document.createElement('div');
+  frameEl.id = PRINT_FRAME_ID;
+  frameEl.innerHTML = `
+    <div class="mcc-print-filename">${filename}</div>
+    <div class="mcc-print-body">${escapedContent}</div>
+  `;
+  document.body.appendChild(frameEl);
+
+  // Give the DOM a tick to settle, then print
+  await new Promise<void>((resolve) => setTimeout(resolve, 50));
+  window.print();
+
+  // Teardown after print dialog closes (afterprint fires on iOS Safari too)
+  const cleanup = () => {
+    document.getElementById(PRINT_STYLE_ID)?.remove();
+    document.getElementById(PRINT_FRAME_ID)?.remove();
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+
+  // Fallback cleanup in case afterprint never fires (some older iOS)
+  setTimeout(cleanup, 30_000);
+}
+
 export function FileActions({ url, filename, content }: Props) {
+  const [printing, setPrinting] = useState(false);
   const [sharing, setSharing] = useState(false);
-  const [shareError, setShareError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  const isPdf = ext === 'pdf';
 
   // --- Print ---
   const handlePrint = useCallback(async () => {
-    // For text/markdown files, open a styled print window
-    const ext = filename.split('.').pop()?.toLowerCase() || '';
-
-    if (ext === 'pdf') {
-      // PDFs: open in new tab and let browser print natively
-      window.open(url, '_blank');
-      return;
-    }
-
-    // Fetch content if not already provided
-    let text = content;
-    if (!text && isTextFile(filename)) {
-      try {
-        const res = await fetch(url);
-        text = await res.text();
-      } catch {
-        text = '(Unable to load file content)';
+    setPrinting(true);
+    setActionError(null);
+    try {
+      if (isPdf) {
+        // PDFs: share via native sheet on mobile (AirPrint), or open new tab on desktop
+        if (canShare) {
+          const res = await fetch(url);
+          const blob = await res.blob();
+          const file = new File([blob], filename, { type: 'application/pdf' });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: filename });
+          } else {
+            window.open(url, '_blank');
+          }
+        } else {
+          window.open(url, '_blank');
+        }
+      } else {
+        await inPagePrint(url, filename, content);
       }
+    } catch (err) {
+      if (err instanceof Error && err.name !== 'AbortError') {
+        setActionError('Print failed');
+        setTimeout(() => setActionError(null), 3000);
+      }
+    } finally {
+      setPrinting(false);
     }
-
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
-    if (!printWindow) {
-      alert('Please allow pop-ups to print this file.');
-      return;
-    }
-
-    const isMarkdown = ext === 'md';
-    const escapedContent = (text || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-
-    printWindow.document.write(`
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>${filename}</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 12pt;
-      line-height: 1.6;
-      color: #000;
-      background: #fff;
-      padding: 1in;
-      max-width: 8.5in;
-      margin: 0 auto;
-    }
-    h1 { font-size: 16pt; border-bottom: 1px solid #ccc; padding-bottom: 6pt; margin-bottom: 12pt; }
-    h2 { font-size: 14pt; margin: 10pt 0 6pt; }
-    h3 { font-size: 12pt; margin: 8pt 0 4pt; }
-    p { margin-bottom: 8pt; }
-    ul, ol { margin-left: 20pt; margin-bottom: 8pt; }
-    li { margin-bottom: 2pt; }
-    code { font-family: 'Courier New', monospace; font-size: 10pt; background: #f4f4f4; padding: 1pt 3pt; border-radius: 2pt; }
-    pre { font-family: 'Courier New', monospace; font-size: 10pt; background: #f4f4f4; padding: 8pt; border-radius: 4pt; white-space: pre-wrap; word-break: break-all; margin-bottom: 8pt; }
-    blockquote { border-left: 3pt solid #ccc; padding-left: 10pt; color: #555; margin-bottom: 8pt; }
-    table { border-collapse: collapse; width: 100%; margin-bottom: 8pt; }
-    th, td { border: 1pt solid #ccc; padding: 4pt 8pt; text-align: left; }
-    th { background: #f4f4f4; font-weight: bold; }
-    hr { border: none; border-top: 1pt solid #ccc; margin: 10pt 0; }
-    a { color: #000; text-decoration: underline; }
-    .filename { font-size: 9pt; color: #666; margin-bottom: 16pt; }
-    @media print {
-      body { padding: 0; }
-    }
-  </style>
-</head>
-<body>
-  <div class="filename">${filename}</div>
-  ${isMarkdown ? `<pre style="white-space:pre-wrap;font-family:inherit;font-size:12pt;background:none;padding:0;">${escapedContent}</pre>` : `<pre>${escapedContent}</pre>`}
-  <script>
-    window.onload = function() {
-      window.print();
-      setTimeout(function() { window.close(); }, 500);
-    };
-  </script>
-</body>
-</html>`);
-    printWindow.document.close();
-  }, [url, filename, content]);
+  }, [url, filename, content, isPdf, canShare]);
 
   // --- Share ---
   const handleShare = useCallback(async () => {
     setSharing(true);
-    setShareError(null);
+    setActionError(null);
 
     try {
       const mimeType = getFileMimeType(filename);
@@ -142,26 +182,18 @@ export function FileActions({ url, filename, content }: Props) {
 
       // Try sharing as a file first (iOS/iPad share sheet → iMessage, AirDrop, etc.)
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: filename,
-        });
+        await navigator.share({ files: [file], title: filename });
       } else if (isTextFile(filename)) {
-        // Fallback: share as text (works on more browsers)
+        // Fallback: share as text
         const text = content || await (await fetch(url)).text();
-        await navigator.share({
-          title: filename,
-          text: text,
-        });
+        await navigator.share({ title: filename, text });
       } else {
-        // Last resort: trigger download
         triggerDownload(blob, filename);
       }
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') {
-        // AbortError = user cancelled share sheet, not a real error
-        setShareError('Share failed');
-        setTimeout(() => setShareError(null), 3000);
+        setActionError('Share failed');
+        setTimeout(() => setActionError(null), 3000);
       }
     } finally {
       setSharing(false);
@@ -175,14 +207,14 @@ export function FileActions({ url, filename, content }: Props) {
       const blob = await res.blob();
       triggerDownload(blob, filename);
     } catch {
-      setShareError('Download failed');
-      setTimeout(() => setShareError(null), 3000);
+      setActionError('Download failed');
+      setTimeout(() => setActionError(null), 3000);
     }
   }, [url, filename]);
 
   return (
     <div className="flex items-center gap-1.5">
-      {/* Share (mobile-first: uses native share sheet on iOS/iPad) */}
+      {/* Share — native share sheet on iOS/iPad */}
       {canShare ? (
         <button
           onClick={handleShare}
@@ -208,16 +240,16 @@ export function FileActions({ url, filename, content }: Props) {
       {/* Print */}
       <button
         onClick={handlePrint}
-        className="flex items-center gap-1 px-2.5 py-1 text-xs rounded bg-surface-overlay hover:bg-surface text-text-secondary hover:text-text-primary transition-colors"
-        title="Print file"
+        disabled={printing}
+        className="flex items-center gap-1 px-2.5 py-1 text-xs rounded bg-surface-overlay hover:bg-surface text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
+        title={isPdf ? 'Share PDF for printing' : 'Print file'}
       >
         <PrintIcon />
-        Print
+        {printing ? 'Loading…' : 'Print'}
       </button>
 
-      {/* Error feedback */}
-      {shareError && (
-        <span className="text-xs text-red-400">{shareError}</span>
+      {actionError && (
+        <span className="text-xs text-red-400">{actionError}</span>
       )}
     </div>
   );
