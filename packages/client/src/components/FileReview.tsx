@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { FileViewer } from './FileViewer';
+import { FileActions } from './FileActions';
 
 interface DirEntry {
   name: string;
@@ -232,11 +233,12 @@ export function FileReview() {
         <div className="flex-1 min-w-0 min-h-0">
           {selectedFile && fileUrl ? (
             <div className="flex flex-col h-full">
-              <div className="p-3 border-b border-white/10 flex items-center gap-2">
-                <span className="text-sm font-medium truncate">
+              <div className="p-3 border-b border-white/10 flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-medium truncate min-w-0">
                   {selectedFile.split('/').pop()}
                 </span>
-                <div className="ml-auto flex gap-2 shrink-0">
+                <div className="ml-auto flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                  <FileActions url={fileUrl} filename={selectedFile} />
                   {mode === 'inbox' && (
                     <button
                       onClick={() => moveFile(selectedFile, 'inbox', 'approved')}
