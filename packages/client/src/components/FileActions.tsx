@@ -30,18 +30,28 @@ function isTextFile(filename: string): boolean {
   return ['md', 'txt', 'json', 'html', 'ts', 'tsx', 'js', 'jsx', 'py', 'sh', 'yaml', 'yml', 'toml', 'csv'].includes(ext);
 }
 
-const PRINT_STYLE_ID = 'mcc-print-styles';
 const PRINT_FRAME_ID = 'mcc-print-frame';
+const PRINT_STYLE_ID = 'mcc-print-styles';
 
 /**
- * In-page print: injects a hidden div + @media print stylesheet into the
- * current document so the app UI disappears and only the file content
- * prints. Works in iOS Safari PWA (no pop-up required).
+ * In-page print without pop-ups — works in iOS Safari PWA.
+ *
+ * Strategy:
+ *  1. Fetch file content
+ *  2. Hide the React root via JS (display:none) — more reliable than
+ *     @media print selectors fighting Tailwind's dark theme
+ *  3. Force html+body to white/black with a <style> tag that uses
+ *     -webkit-print-color-adjust: exact so iOS doesn't apply its own tint
+ *  4. Append a normal-flow <div> (NOT position:fixed) with the content —
+ *     normal flow lets iOS paginate across multiple pages properly
+ *  5. window.print() — shows AirPrint sheet
+ *  6. Restore everything on afterprint (+ 30s safety fallback)
  */
 async function inPagePrint(url: string, filename: string, content?: string) {
   const ext = filename.split('.').pop()?.toLowerCase() || '';
+  const isMono = ['json', 'ts', 'tsx', 'js', 'jsx', 'py', 'sh', 'yaml', 'yml', 'toml', 'csv'].includes(ext);
 
-  // Fetch content
+  // 1. Fetch content
   let text = content;
   if (!text) {
     try {
@@ -57,68 +67,75 @@ async function inPagePrint(url: string, filename: string, content?: string) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
-  // Inject print stylesheet — hides everything except #mcc-print-frame
+  // 2. Hide the app root(s) by toggling display in JS
+  const appRoots = Array.from(document.body.children) as HTMLElement[];
+  const prevDisplays = appRoots.map((el) => el.style.display);
+  appRoots.forEach((el) => { el.style.display = 'none'; });
+
+  // 3. Force html/body to white — override Tailwind dark theme
   const styleEl = document.createElement('style');
   styleEl.id = PRINT_STYLE_ID;
   styleEl.textContent = `
-    @media print {
-      body > *:not(#${PRINT_FRAME_ID}) { display: none !important; }
-      #${PRINT_FRAME_ID} {
-        display: block !important;
-        position: fixed;
-        inset: 0;
-        background: #fff;
-        color: #000;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        font-size: 12pt;
-        line-height: 1.6;
-        padding: 0.75in;
-        z-index: 99999;
-        overflow: visible;
-      }
-      .mcc-print-filename {
-        font-size: 9pt;
-        color: #666;
-        margin-bottom: 14pt;
-        border-bottom: 1pt solid #ddd;
-        padding-bottom: 6pt;
-      }
-      .mcc-print-body {
-        white-space: pre-wrap;
-        word-break: break-word;
-        font-family: ${ext === 'json' || ext === 'ts' || ext === 'js' || ext === 'py' ? "'Courier New', monospace" : 'inherit'};
-        font-size: ${ext === 'json' || ext === 'ts' || ext === 'js' || ext === 'py' ? '10pt' : '12pt'};
-      }
+    html, body {
+      background: #ffffff !important;
+      color: #000000 !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
     }
-    @media screen {
-      #${PRINT_FRAME_ID} { display: none !important; }
+    #${PRINT_FRAME_ID} {
+      background: #ffffff !important;
+      color: #000000 !important;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      font-size: 12pt;
+      line-height: 1.65;
+      padding: 0;
+      margin: 0;
+      width: 100%;
+    }
+    #${PRINT_FRAME_ID} .pf-filename {
+      font-size: 9pt;
+      color: #555555;
+      border-bottom: 1pt solid #cccccc;
+      padding-bottom: 6pt;
+      margin-bottom: 14pt;
+    }
+    #${PRINT_FRAME_ID} .pf-body {
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: break-word;
+      font-family: ${isMono ? "'Courier New', 'Courier', monospace" : 'inherit'};
+      font-size: ${isMono ? '10pt' : '12pt'};
+      color: #000000 !important;
+      background: transparent !important;
     }
   `;
   document.head.appendChild(styleEl);
 
-  // Inject print content div directly into body
+  // 4. Append content as normal-flow div (NOT fixed — lets iOS paginate)
   const frameEl = document.createElement('div');
   frameEl.id = PRINT_FRAME_ID;
   frameEl.innerHTML = `
-    <div class="mcc-print-filename">${filename}</div>
-    <div class="mcc-print-body">${escapedContent}</div>
+    <div class="pf-filename">${filename}</div>
+    <div class="pf-body">${escapedContent}</div>
   `;
   document.body.appendChild(frameEl);
 
-  // Give the DOM a tick to settle, then print
-  await new Promise<void>((resolve) => setTimeout(resolve, 50));
+  // Give browser a paint cycle to apply styles before printing
+  await new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 80)));
+
+  // 5. Print
   window.print();
 
-  // Teardown after print dialog closes (afterprint fires on iOS Safari too)
+  // 6. Restore
   const cleanup = () => {
+    appRoots.forEach((el, i) => { el.style.display = prevDisplays[i]; });
     document.getElementById(PRINT_STYLE_ID)?.remove();
     document.getElementById(PRINT_FRAME_ID)?.remove();
     window.removeEventListener('afterprint', cleanup);
   };
   window.addEventListener('afterprint', cleanup);
-
-  // Fallback cleanup in case afterprint never fires (some older iOS)
-  setTimeout(cleanup, 30_000);
+  // Safety fallback — afterprint may not fire on all iOS versions
+  setTimeout(cleanup, 60_000);
 }
 
 export function FileActions({ url, filename, content }: Props) {
