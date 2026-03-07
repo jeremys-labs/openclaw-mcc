@@ -123,7 +123,7 @@ export function ChatPanel({ agentKey }: Props) {
       />
 
       {/* Voice */}
-      <div className="border-t border-white/5 bg-surface-raised">
+      <div className="border-t border-white/5 bg-surface-raised pb-14 md:pb-0">
         <VoiceMode agentKey={agentKey} onTranscript={handleVoiceTranscript} />
       </div>
     </div>
