@@ -134,7 +134,7 @@ export function createChatRouter({ config, db, gateway, streaming }: ChatDeps): 
     let gatewayOk = false;
     try {
       if (gateway.isConnected) {
-        await gateway.request('chat.interrupt', { sessionKey });
+        await gateway.request('chat.abort', { sessionKey });
         gatewayOk = true;
       }
     } catch (err) {
