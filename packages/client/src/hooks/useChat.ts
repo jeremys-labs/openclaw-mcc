@@ -1,5 +1,7 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useChatStore } from '../stores/chatStore';
+
+const HISTORY_PAGE_SIZE = 100;
 
 /** Generate a UUID, falling back to a manual implementation in insecure contexts (plain HTTP). */
 function generateUUID(): string {
@@ -24,6 +26,9 @@ export function useChat(agentKey: string) {
   const setDraftAction = useChatStore((s) => s.setDraft);
   const draft = useChatStore((s) => s.drafts[agentKey] ?? '');
 
+  // Track the highest seq we've seen for this agent — used by the safety-net poll
+  const latestSeqRef = useRef<Record<string, number>>({});
+
   const sendMessage = useCallback(async (content: string) => {
     const idempotencyKey = generateUUID();
     const seq = Date.now();
@@ -44,14 +49,24 @@ export function useChat(agentKey: string) {
       if (!res.ok) {
         throw new Error(`Server responded with ${res.status}`);
       }
+
       // Safety net: if SSE missed the response (e.g. mobile browser suspended the
-      // connection while keyboard was open), reload history from the DB after a delay.
-      // The deduplicate logic in the store prevents double-rendering if SSE worked fine.
+      // connection while keyboard was open), fetch only new messages since the last
+      // known seq. The store's dedup logic prevents double-rendering if SSE worked.
       setTimeout(async () => {
         try {
-          const histRes = await fetch(`/api/chat-history/${agentKey}`);
-          const messages = await histRes.json();
-          useChatStore.getState().setMessages(agentKey, messages);
+          const since = latestSeqRef.current[agentKey] ?? 0;
+          const histRes = await fetch(`/api/chat-history/${agentKey}?since=${since}`);
+          const newMsgs = await histRes.json();
+          if (newMsgs.length > 0) {
+            const store = useChatStore.getState();
+            newMsgs.forEach((m: { seq: number; role: 'user' | 'assistant'; content: string; timestamp: number }) => {
+              store.addMessage(agentKey, m);
+            });
+            // Update latest seq tracker
+            const maxSeq = Math.max(...newMsgs.map((m: { seq: number }) => m.seq));
+            latestSeqRef.current[agentKey] = Math.max(latestSeqRef.current[agentKey] ?? 0, maxSeq);
+          }
         } catch { /* ignore */ }
       }, 5000);
     } catch (err) {
@@ -95,10 +110,42 @@ export function useChat(agentKey: string) {
     }
   }, [agentKey, addMessage]);
 
+  // Initial load: fetch last HISTORY_PAGE_SIZE messages
   const loadHistory = useCallback(async () => {
-    const res = await fetch(`/api/chat-history/${agentKey}`);
+    const res = await fetch(`/api/chat-history/${agentKey}?limit=${HISTORY_PAGE_SIZE}`);
     const messages = await res.json();
     useChatStore.getState().setMessages(agentKey, messages);
+
+    // Track latest seq and whether there are more messages to load
+    if (messages.length > 0) {
+      const maxSeq = Math.max(...messages.map((m: { seq: number }) => m.seq));
+      latestSeqRef.current[agentKey] = maxSeq;
+    }
+    // If we got a full page, there are likely older messages
+    useChatStore.getState().setHasOlderMessages(agentKey, messages.length >= HISTORY_PAGE_SIZE);
+  }, [agentKey]);
+
+  // Load older messages (pagination — prepend before the earliest loaded seq)
+  const loadOlderMessages = useCallback(async () => {
+    const store = useChatStore.getState();
+    if (store.loadingOlder[agentKey]) return;
+
+    const current = store.messages[agentKey] ?? [];
+    if (current.length === 0) return;
+
+    const oldestSeq = current[0].seq;
+    store.setLoadingOlder(agentKey, true);
+    try {
+      const res = await fetch(
+        `/api/chat-history/${agentKey}?before=${oldestSeq}&limit=${HISTORY_PAGE_SIZE}`
+      );
+      const older = await res.json();
+      store.prependMessages(agentKey, older);
+      // If we got a full page, there may still be more
+      store.setHasOlderMessages(agentKey, older.length >= HISTORY_PAGE_SIZE);
+    } catch { /* ignore */ } finally {
+      store.setLoadingOlder(agentKey, false);
+    }
   }, [agentKey]);
 
   const interrupt = useCallback(async () => {
@@ -115,6 +162,7 @@ export function useChat(agentKey: string) {
     sendMessage,
     retryMessage,
     loadHistory,
+    loadOlderMessages,
     interrupt,
   };
 }

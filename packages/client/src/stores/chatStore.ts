@@ -16,13 +16,20 @@ interface ChatState {
   drafts: Record<string, string>;
   streaming: Record<string, boolean>;
   streamBuffer: Record<string, string>;
+  // Pagination state per agent
+  hasOlderMessages: Record<string, boolean>;
+  loadingOlder: Record<string, boolean>;
+
   addMessage: (agent: string, msg: Message) => void;
   setMessages: (agent: string, msgs: Message[]) => void;
+  prependMessages: (agent: string, msgs: Message[]) => void;
   setDraft: (agent: string, text: string) => void;
   setStreaming: (agent: string, streaming: boolean) => void;
   appendStreamBuffer: (agent: string, content: string) => void;
   finalizeStream: (agent: string, content: string) => void;
   clearMessages: (agent: string) => void;
+  setHasOlderMessages: (agent: string, has: boolean) => void;
+  setLoadingOlder: (agent: string, loading: boolean) => void;
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -30,6 +37,9 @@ export const useChatStore = create<ChatState>((set) => ({
   drafts: {},
   streaming: {},
   streamBuffer: {},
+  hasOlderMessages: {},
+  loadingOlder: {},
+
   addMessage: (agent, msg) =>
     set((s) => {
       if (SYSTEM_MSG_RE.test(msg.content.trim())) return s;
@@ -43,26 +53,54 @@ export const useChatStore = create<ChatState>((set) => ({
         messages: { ...s.messages, [agent]: [...existing, msg] },
       };
     }),
+
   setMessages: (agent, msgs) =>
     set((s) => ({
-      messages: { ...s.messages, [agent]: msgs.filter((m) => !SYSTEM_MSG_RE.test(m.content.trim())) },
+      messages: {
+        ...s.messages,
+        [agent]: msgs.filter((m) => !SYSTEM_MSG_RE.test(m.content.trim())),
+      },
     })),
+
+  // Prepend older messages (pagination) without duplicating
+  prependMessages: (agent, msgs) =>
+    set((s) => {
+      const existing = s.messages[agent] || [];
+      const existingSeqs = new Set(existing.map((m) => m.seq));
+      const fresh = msgs.filter(
+        (m) => !SYSTEM_MSG_RE.test(m.content.trim()) && !existingSeqs.has(m.seq)
+      );
+      if (fresh.length === 0) return s;
+      return {
+        messages: { ...s.messages, [agent]: [...fresh, ...existing] },
+      };
+    }),
+
   setDraft: (agent, text) =>
     set((s) => ({ drafts: { ...s.drafts, [agent]: text } })),
+
   setStreaming: (agent, streaming) =>
     set((s) => ({
       streaming: { ...s.streaming, [agent]: streaming },
       ...(streaming ? { streamBuffer: { ...s.streamBuffer, [agent]: '' } } : {}),
     })),
+
   appendStreamBuffer: (agent, content) =>
     set((s) => ({
-      streamBuffer: { ...s.streamBuffer, [agent]: (s.streamBuffer[agent] || '') + content },
+      streamBuffer: {
+        ...s.streamBuffer,
+        [agent]: (s.streamBuffer[agent] || '') + content,
+      },
     })),
+
   finalizeStream: (agent, content) =>
     set((s) => {
       // Skip adding empty or system messages — just clear streaming state
       if (!content.trim() || SYSTEM_MSG_RE.test(content.trim())) {
-        return { streaming: { ...s.streaming, [agent]: false }, streamBuffer: { ...s.streamBuffer, [agent]: '' } };
+        return {
+          streaming: { ...s.streaming, [agent]: false },
+          streamBuffer: { ...s.streamBuffer, [agent]: '' },
+        };
       }
       const existing = s.messages[agent] || [];
       const isDuplicate = existing.some(
@@ -73,11 +111,29 @@ export const useChatStore = create<ChatState>((set) => ({
         streamBuffer: { ...s.streamBuffer, [agent]: '' },
         messages: isDuplicate
           ? s.messages
-          : { ...s.messages, [agent]: [...existing, { seq: Date.now(), role: 'assistant' as const, content, timestamp: Date.now() }] },
+          : {
+              ...s.messages,
+              [agent]: [
+                ...existing,
+                {
+                  seq: Date.now(),
+                  role: 'assistant' as const,
+                  content,
+                  timestamp: Date.now(),
+                },
+              ],
+            },
       };
     }),
+
   clearMessages: (agent) =>
     set((s) => ({ messages: { ...s.messages, [agent]: [] } })),
+
+  setHasOlderMessages: (agent, has) =>
+    set((s) => ({ hasOlderMessages: { ...s.hasOlderMessages, [agent]: has } })),
+
+  setLoadingOlder: (agent, loading) =>
+    set((s) => ({ loadingOlder: { ...s.loadingOlder, [agent]: loading } })),
 }));
 
 // Expose for Playwright tests

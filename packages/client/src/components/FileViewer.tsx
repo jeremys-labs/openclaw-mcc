@@ -40,5 +40,17 @@ export function FileViewer({ url, filename }: Props) {
     }
   }
 
+  if (ext === 'html' || ext === 'htm') {
+    return (
+      <iframe
+        srcDoc={content}
+        sandbox="allow-scripts allow-same-origin"
+        className="w-full border-0 rounded"
+        style={{ height: '100%', minHeight: '600px' }}
+        title={filename}
+      />
+    );
+  }
+
   return <pre className="text-xs text-text-primary font-mono whitespace-pre-wrap">{content}</pre>;
 }

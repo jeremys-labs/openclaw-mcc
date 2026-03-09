@@ -16,6 +16,7 @@
     "@dicebear/pixel-art": "^9.3.2",
     "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-query": "^5.0.0",
+    "lucide-react": "^0.577.0",
     "pixi.js": "^8.0.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

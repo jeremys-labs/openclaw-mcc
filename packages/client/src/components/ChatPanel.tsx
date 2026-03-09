@@ -8,6 +8,7 @@ import { useSSE } from '../hooks/useSSE';
 import { useChatStore } from '../stores/chatStore';
 import { useVoiceStore } from '../stores/voiceStore';
 import { useAgentStore } from '../stores/agentStore';
+import { ChevronUp, Loader2 } from 'lucide-react';
 
 const EMPTY_MESSAGES: { seq: number; role: 'user' | 'assistant'; content: string; timestamp: number }[] = [];
 
@@ -16,15 +17,19 @@ interface Props {
 }
 
 export function ChatPanel({ agentKey }: Props) {
-  const { draft, setDraft, sendMessage, retryMessage, loadHistory, interrupt } = useChat(agentKey);
+  const { draft, setDraft, sendMessage, retryMessage, loadHistory, loadOlderMessages, interrupt } = useChat(agentKey);
   const { speak } = useVoice();
   const messages = useChatStore((s) => s.messages[agentKey] ?? EMPTY_MESSAGES);
   const isStreaming = useChatStore((s) => !!s.streaming[agentKey]);
   const streamBuffer = useChatStore((s) => s.streamBuffer[agentKey] ?? '');
+  const hasOlderMessages = useChatStore((s) => !!s.hasOlderMessages[agentKey]);
+  const loadingOlder = useChatStore((s) => !!s.loadingOlder[agentKey]);
   const activeVoiceAgent = useVoiceStore((s) => s.activeAgent);
   const agent = useAgentStore((s) => s.agents[agentKey]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevMsgCountRef = useRef(0);
+  // Track scroll position before prepending older messages so we can restore it
+  const scrollAnchorRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
 
   // Keep speak ref stable to avoid re-render loops
   const speakRef = useRef(speak);
@@ -59,9 +64,31 @@ export function ChatPanel({ agentKey }: Props) {
     loadHistory();
   }, [loadHistory]);
 
+  // Auto-scroll to bottom when new messages arrive (but not when loading older ones)
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+    if (scrollAnchorRef.current) {
+      // We just prepended older messages — restore scroll position
+      const el = scrollRef.current;
+      if (el) {
+        const { scrollHeight, scrollTop } = scrollAnchorRef.current;
+        el.scrollTop = el.scrollHeight - scrollHeight + scrollTop;
+      }
+      scrollAnchorRef.current = null;
+    } else {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+    }
   }, [messages, streamBuffer]);
+
+  const handleLoadOlder = useCallback(() => {
+    // Snapshot scroll position before the prepend
+    if (scrollRef.current) {
+      scrollAnchorRef.current = {
+        scrollHeight: scrollRef.current.scrollHeight,
+        scrollTop: scrollRef.current.scrollTop,
+      };
+    }
+    loadOlderMessages();
+  }, [loadOlderMessages]);
 
   return (
     <div className="flex flex-col h-full">
@@ -86,6 +113,23 @@ export function ChatPanel({ agentKey }: Props) {
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4">
+        {/* Load older messages button */}
+        {hasOlderMessages && (
+          <div className="flex justify-center mb-3">
+            <button
+              onClick={handleLoadOlder}
+              disabled={loadingOlder}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary bg-surface-overlay hover:bg-surface-raised rounded-full border border-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loadingOlder ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <ChevronUp className="w-3 h-3" />
+              )}
+              {loadingOlder ? 'Loading…' : 'Load older messages'}
+            </button>
+          </div>
+        )}
         {messages.map((msg, i) => {
           // For error messages, find the preceding user message to get the original content for retry
           const prevUserMsg = msg.error

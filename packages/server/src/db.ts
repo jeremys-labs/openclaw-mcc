@@ -2,7 +2,8 @@ import Database from 'better-sqlite3';
 
 export interface ChatDB {
   addMessage(agent: string, role: string, content: string, timestamp: number, idempotencyKey?: string, metadata?: Record<string, unknown>): { seq: number; duplicate: boolean };
-  getMessages(agent: string): Array<{ seq: number; agent: string; role: string; content: string; timestamp: number; metadata?: string }>;
+  getMessages(agent: string, limit?: number): Array<{ seq: number; agent: string; role: string; content: string; timestamp: number; metadata?: string }>;
+  getMessagesBefore(agent: string, beforeSeq: number, limit: number): Array<{ seq: number; agent: string; role: string; content: string; timestamp: number; metadata?: string }>;
   getMessagesSince(agent: string, sinceSeq: number): Array<{ seq: number; agent: string; role: string; content: string; timestamp: number }>;
   clearMessages(agent: string): void;
   close(): void;
@@ -45,6 +46,15 @@ export function createChatDB(dbPath: string): ChatDB {
     'SELECT seq, agent, role, content, timestamp, metadata FROM messages WHERE agent = ? ORDER BY seq ASC'
   );
 
+  const selectByAgentLimited = db.prepare(
+    // Grab last N rows by selecting in DESC order then reversing — keeps chronological order
+    'SELECT * FROM (SELECT seq, agent, role, content, timestamp, metadata FROM messages WHERE agent = ? ORDER BY seq DESC LIMIT ?) ORDER BY seq ASC'
+  );
+
+  const selectBefore = db.prepare(
+    'SELECT * FROM (SELECT seq, agent, role, content, timestamp, metadata FROM messages WHERE agent = ? AND seq < ? ORDER BY seq DESC LIMIT ?) ORDER BY seq ASC'
+  );
+
   const selectSince = db.prepare(
     'SELECT seq, agent, role, content, timestamp FROM messages WHERE agent = ? AND seq > ? ORDER BY seq ASC'
   );
@@ -74,8 +84,15 @@ export function createChatDB(dbPath: string): ChatDB {
       return { seq: Number(result.lastInsertRowid), duplicate: false };
     },
 
-    getMessages(agent) {
+    getMessages(agent, limit?) {
+      if (limit && limit > 0) {
+        return selectByAgentLimited.all(agent, limit) as Array<{ seq: number; agent: string; role: string; content: string; timestamp: number; metadata?: string }>;
+      }
       return selectByAgent.all(agent) as Array<{ seq: number; agent: string; role: string; content: string; timestamp: number; metadata?: string }>;
+    },
+
+    getMessagesBefore(agent, beforeSeq, limit) {
+      return selectBefore.all(agent, beforeSeq, limit) as Array<{ seq: number; agent: string; role: string; content: string; timestamp: number; metadata?: string }>;
     },
 
     getMessagesSince(agent, sinceSeq) {

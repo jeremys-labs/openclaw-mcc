@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -10,7 +11,7 @@ interface Props {
   onRetry?: () => void;
 }
 
-export function ChatMessage({ role, content, agentName, streaming, error, onRetry }: Props) {
+export const ChatMessage = memo(function ChatMessage({ role, content, agentName, streaming, error, onRetry }: Props) {
   const isUser = role === 'user';
 
   if (error) {
@@ -53,4 +54,4 @@ export function ChatMessage({ role, content, agentName, streaming, error, onRetr
       </div>
     </div>
   );
-}
+});

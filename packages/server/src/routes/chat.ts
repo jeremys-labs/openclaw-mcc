@@ -83,20 +83,33 @@ export function createChatRouter({ config, db, gateway, streaming }: ChatDeps): 
   });
 
   // Get chat history
+  // Query params:
+  //   ?since=<seq>   — return only messages after this seq (for polling new messages)
+  //   ?before=<seq>  — return up to `limit` messages before this seq (for "load older")
+  //   ?limit=<n>     — cap results (default 100 for initial load, ignored when ?since is set)
   router.get('/chat-history/:agentKey', (req: Request, res: Response) => {
     const agentKey = getAgentKey(req);
     if (!validateAgent(config, agentKey, res)) return;
 
     const sinceParam = req.query.since;
+    const beforeParam = req.query.before;
+    const limitParam = req.query.limit;
     const since = sinceParam ? Number(sinceParam) : undefined;
+    const before = beforeParam ? Number(beforeParam) : undefined;
+    const limit = limitParam ? Number(limitParam) : 100;
 
     const filterSystem = (msgs: Record<string, unknown>[]) =>
       msgs.filter((m) => !SYSTEM_MESSAGE_PATTERNS.test(String(m.content).trim()));
 
     if (since !== undefined && since > 0) {
+      // New messages only — no limit needed
       res.json(filterSystem(db.getMessagesSince(agentKey, since)));
+    } else if (before !== undefined && before > 0) {
+      // Pagination: load older messages before a given seq
+      res.json(filterSystem(db.getMessagesBefore(agentKey, before, limit)));
     } else {
-      res.json(filterSystem(db.getMessages(agentKey)));
+      // Initial load: return last N messages
+      res.json(filterSystem(db.getMessages(agentKey, limit)));
     }
   });
 
