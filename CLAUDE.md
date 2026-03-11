@@ -81,4 +81,4 @@ Content root: `~/.openclaw` (set via `CONTENT_ROOT` env var)
 
 ## Remaining Work
 
-See [memory/remaining-work.md](/Users/jeremylahners/.claude/projects/-Volumes-Repo-Drive-src-openclaw-mcc/memory/remaining-work.md) for the prioritized task list.
+See the project memory for the prioritized task list.
