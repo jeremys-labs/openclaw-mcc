@@ -21,6 +21,7 @@ interface CronDelivery {
   mode?: string;
   channel?: string;
   to?: string;
+  bestEffort?: boolean;
 }
 
 interface CronState {
@@ -95,6 +96,48 @@ function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
   return `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`;
+}
+
+/**
+ * Derive a human-readable output description from the delivery object.
+ *
+ * Gateway semantics:
+ *   mode "announce"           → gateway auto-posts the run summary
+ *   mode "none" + channel/to  → agent sends output itself via messaging tools
+ *   mode "none", no channel   → silent / no output
+ *   channel "last"            → replies to whichever channel triggered the job
+ *   to "user:..."             → Discord DM
+ *   to "#channel-name" or channel id → Discord channel
+ */
+function describeOutput(delivery?: CronDelivery): string {
+  if (!delivery) return 'Silent';
+
+  const { mode, channel, to } = delivery;
+
+  // Resolve destination label
+  let dest = '';
+  if (to) {
+    if (to.startsWith('user:')) dest = 'Discord DM';
+    else if (to.startsWith('#') || /^\d{17,19}$/.test(to)) dest = `Discord #${to.replace(/^#/, '')}`;
+    else dest = to;
+  } else if (channel === 'discord') {
+    dest = 'Discord';
+  } else if (channel === 'last') {
+    dest = 'reply to trigger channel';
+  } else if (channel) {
+    dest = channel;
+  }
+
+  if (mode === 'announce') {
+    return dest ? `Auto-delivered → ${dest}` : 'Auto-delivered';
+  }
+
+  // mode "none" but has routing → agent sends itself
+  if (dest) {
+    return `Agent sends → ${dest}`;
+  }
+
+  return 'Silent';
 }
 
 function formatSchedule(s: CronSchedule): string {
@@ -196,13 +239,10 @@ export function CronDetailPanel({ jobId, onClose }: Props) {
             <Pill label="Schedule" value={formatSchedule(data.job.schedule)} />
             <Pill label="Target" value={data.job.sessionTarget ?? '—'} />
             <Pill label="Type" value={data.job.payload?.kind ?? '—'} />
-            <Pill label="Output" value={data.job.delivery?.mode ?? 'none'} />
+            <Pill label="Output" value={describeOutput(data.job.delivery)} />
             {data.job.payload?.model && <Pill label="Model" value={data.job.payload.model} mono />}
             {data.job.payload?.timeoutSeconds != null && (
               <Pill label="Timeout" value={data.job.payload.timeoutSeconds === 0 ? 'none' : `${data.job.payload.timeoutSeconds}s`} />
-            )}
-            {data.job.delivery?.mode !== 'none' && data.job.delivery?.to && (
-              <Pill label="Deliver to" value={data.job.delivery.to} />
             )}
             {data.job.state?.nextRunAtMs && (
               <Pill label="Next run" value={formatRelative(data.job.state.nextRunAtMs)} />
