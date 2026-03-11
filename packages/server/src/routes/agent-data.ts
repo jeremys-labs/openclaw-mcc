@@ -13,6 +13,7 @@ interface CronSchedule {
   expr?: string;
   tz?: string;
   everyMs?: number;
+  anchorMs?: number;
 }
 
 interface CronState {
@@ -20,6 +21,23 @@ interface CronState {
   lastRunAtMs?: number;
   lastStatus?: string;
   consecutiveErrors?: number;
+  lastDurationMs?: number;
+  lastRunStatus?: string;
+  lastDeliveryStatus?: string;
+  lastDelivered?: boolean;
+}
+
+interface CronPayload {
+  kind: string;
+  message?: string;
+  model?: string;
+  timeoutSeconds?: number;
+}
+
+interface CronDelivery {
+  mode?: string;
+  channel?: string;
+  to?: string;
 }
 
 interface CronJob {
@@ -27,8 +45,28 @@ interface CronJob {
   agentId: string;
   name: string;
   enabled: boolean;
+  createdAtMs?: number;
+  updatedAtMs?: number;
   schedule: CronSchedule;
+  sessionTarget?: string;
+  payload?: CronPayload;
+  delivery?: CronDelivery;
   state?: CronState;
+}
+
+interface CronRunEntry {
+  ts: number;
+  jobId: string;
+  action: string;
+  status: string;
+  summary?: string;
+  runAtMs?: number;
+  durationMs?: number;
+  model?: string;
+  provider?: string;
+  usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number };
+  delivered?: boolean;
+  deliveryStatus?: string;
 }
 
 interface CronListResponse {
@@ -260,6 +298,45 @@ export function createAgentDataRoutes(config: AppConfig, contentRoot: string, ga
     }
 
     res.status(400).json({ error: `Unsupported source type: ${source}` });
+  });
+
+  // ------------------------------------------------------------------
+  // GET /api/cron/:jobId/detail
+  // Returns the full job definition + recent run history
+  // ------------------------------------------------------------------
+  router.get('/cron/:jobId/detail', async (req, res) => {
+    if (!gateway || !gateway.isConnected) {
+      res.status(503).json({ error: 'Gateway not connected' });
+      return;
+    }
+
+    const { jobId } = req.params;
+
+    try {
+      // Fetch full job list and find the matching job by id prefix or full id
+      const listResult = await gateway.request('cron.list', { limit: 200 }) as { jobs: CronJob[] } | null;
+      const jobs = listResult?.jobs ?? [];
+      const job = jobs.find((j) => j.id === jobId || j.id.startsWith(jobId));
+
+      if (!job) {
+        res.status(404).json({ error: 'Job not found' });
+        return;
+      }
+
+      // Fetch recent runs
+      let runs: CronRunEntry[] = [];
+      try {
+        const runsResult = await gateway.request('cron.runs', { jobId: job.id, limit: 5 }) as { entries: CronRunEntry[] } | null;
+        runs = runsResult?.entries ?? [];
+      } catch {
+        // runs are optional — don't fail the whole request
+      }
+
+      res.json({ job, runs });
+    } catch (err) {
+      console.error('[agent-data] cron detail error:', err);
+      res.status(500).json({ error: 'Failed to fetch cron detail' });
+    }
   });
 
   return router;

@@ -3,6 +3,7 @@ import { useAgentStore } from '../stores/agentStore';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkFrontmatter from 'remark-frontmatter';
+import { CronDetailPanel } from './CronDetailPanel';
 
 interface Props {
   agentKey: string;
@@ -96,7 +97,7 @@ function formatLabel(key: string): string {
   return key.replace(/([A-Z])/g, ' $1').replace(/[_-]/g, ' ').replace(/^\w/, c => c.toUpperCase());
 }
 
-function CardItem({ obj }: { obj: Record<string, unknown> }) {
+function CardItem({ obj, onSelect }: { obj: Record<string, unknown>; onSelect?: (id: string) => void }) {
   const title = findTitle(obj);
   const subtitle = findSubtitle(obj);
   const status = typeof obj.status === 'string' ? obj.status : null;
@@ -109,7 +110,10 @@ function CardItem({ obj }: { obj: Record<string, unknown> }) {
   );
 
   return (
-    <div className="border border-white/10 rounded-lg p-3 hover:border-white/20 transition-colors">
+    <div
+      className={`border border-white/10 rounded-lg p-3 transition-colors ${onSelect ? 'cursor-pointer hover:border-accent/50 hover:bg-accent/5' : 'hover:border-white/20'}`}
+      onClick={onSelect && id ? () => onSelect(id) : undefined}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -162,13 +166,16 @@ function ObjectSection({ label, data }: { label: string; data: Record<string, un
   );
 }
 
-function JsonRenderer({ data }: { data: unknown }) {
+function JsonRenderer({ data, onSelect }: { data: unknown; onSelect?: (id: string) => void }) {
   // Array of objects → card list
   if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'object') {
     return (
       <div className="space-y-2">
+        {onSelect && (
+          <p className="text-[11px] text-text-secondary px-1 mb-1">Click a job to see details</p>
+        )}
         {data.map((item, i) => (
-          <CardItem key={item?.id ?? i} obj={item as Record<string, unknown>} />
+          <CardItem key={item?.id ?? i} obj={item as Record<string, unknown>} onSelect={onSelect} />
         ))}
       </div>
     );
@@ -227,6 +234,7 @@ export function AgentInfoTabs({ agentKey }: Props) {
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [tabData, setTabData] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
+  const [selectedCronId, setSelectedCronId] = useState<string | null>(null);
   // Track which cron-sourced tabs have been pre-fetched and returned empty.
   // null = still checking, Set = resolved
   const [emptyCronTabs, setEmptyCronTabs] = useState<Set<string> | null>(null);
@@ -279,6 +287,7 @@ export function AgentInfoTabs({ agentKey }: Props) {
 
   const currentTab = tabs.find((t) => t.id === activeTab);
   const renderer = currentTab?.renderer || 'default';
+  const isCronTab = currentTab?.source === 'crons';
 
   return (
     <div className="flex flex-col h-full">
@@ -286,7 +295,7 @@ export function AgentInfoTabs({ agentKey }: Props) {
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => { setActiveTab(tab.id); setSelectedCronId(null); }}
             className={`px-3 py-2 text-xs whitespace-nowrap ${
               activeTab === tab.id ? 'border-b-2 border-accent text-accent' : 'text-text-secondary hover:text-text-primary'
             }`}
@@ -295,17 +304,28 @@ export function AgentInfoTabs({ agentKey }: Props) {
           </button>
         ))}
       </div>
-      <div className="flex-1 overflow-y-auto p-3">
-        {loading ? (
-          <div className="text-text-secondary text-sm">Loading...</div>
-        ) : (renderer === 'markdown' || typeof tabData === 'string') && typeof tabData === 'string' ? (
-          <div className="prose prose-invert prose-sm max-w-none">
-            <ReactMarkdown remarkPlugins={[remarkGfm, remarkFrontmatter]}>{tabData}</ReactMarkdown>
-          </div>
-        ) : (
-          <JsonRenderer data={tabData} />
-        )}
-      </div>
+
+      {/* Detail panel overlay for cron jobs */}
+      {selectedCronId ? (
+        <div className="flex-1 overflow-hidden">
+          <CronDetailPanel
+            jobId={selectedCronId}
+            onClose={() => setSelectedCronId(null)}
+          />
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto p-3">
+          {loading ? (
+            <div className="text-text-secondary text-sm">Loading...</div>
+          ) : (renderer === 'markdown' || typeof tabData === 'string') && typeof tabData === 'string' ? (
+            <div className="prose prose-invert prose-sm max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm, remarkFrontmatter]}>{tabData}</ReactMarkdown>
+            </div>
+          ) : (
+            <JsonRenderer data={tabData} onSelect={isCronTab ? setSelectedCronId : undefined} />
+          )}
+        </div>
+      )}
     </div>
   );
 }
