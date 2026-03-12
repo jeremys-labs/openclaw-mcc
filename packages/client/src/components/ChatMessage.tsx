@@ -2,6 +2,21 @@ import { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
+/**
+ * LLMs occasionally emit GFM tables with all rows collapsed onto a single line
+ * (no newlines between header, separator, and data rows). remark-gfm requires
+ * each row on its own line to parse correctly, so we normalize before rendering.
+ *
+ * Detects the pattern:  | cells | <space> |---|---| <space> | cells |
+ * and splits at row boundaries. Already-correct multi-line tables are unchanged.
+ */
+function normalizeMarkdownTables(content: string): string {
+  return content.replace(
+    /(\|[^\n]+\|)\s+(\|[-| :]+\|)\s+(\|[^\n]+(?:\s+\|[^\n]+\|)*)/g,
+    (match) => match.split(/(?<=\|)\s+(?=\|)/).join('\n')
+  );
+}
+
 interface Props {
   role: 'user' | 'assistant';
   content: string;
@@ -46,7 +61,7 @@ export const ChatMessage = memo(function ChatMessage({ role, content, agentName,
           <div className="text-xs text-text-secondary mb-1 font-medium">{agentName}</div>
         )}
         <div className="prose prose-invert prose-sm max-w-none break-words [overflow-wrap:anywhere] [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:break-all">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizeMarkdownTables(content)}</ReactMarkdown>
         </div>
         {streaming && (
           <span className="inline-block w-2 h-4 bg-accent animate-pulse ml-1" />

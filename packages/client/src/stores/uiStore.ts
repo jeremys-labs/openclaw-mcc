@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-type View = 'office' | 'channels' | 'files';
+type View = 'office' | 'channels' | 'files' | 'projects';
 
 interface UIState {
   activeView: View;

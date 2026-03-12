@@ -12,6 +12,7 @@ import { AgentInfoTabs } from './components/AgentInfoTabs';
 import { ChannelsView } from './components/ChannelsView';
 import { FileReview } from './components/FileReview';
 import { StandupWidget } from './components/StandupWidget';
+import { ProjectsView } from './components/ProjectsView';
 
 export default function App() {
   useConfig();
@@ -103,6 +104,7 @@ export default function App() {
           )}
           {activeView === 'channels' && <ChannelsView />}
           {activeView === 'files' && <FileReview />}
+          {activeView === 'projects' && <ProjectsView />}
         </div>
 
         {/* Agent side panel - sidebar on desktop, slide-up sheet on mobile */}

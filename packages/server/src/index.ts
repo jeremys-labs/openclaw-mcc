@@ -16,6 +16,7 @@ import { createStandupRoutes } from './routes/standup.js';
 import { createChannelRoutes } from './routes/channels.js';
 import { createAgentDataRoutes } from './routes/agent-data.js';
 import { createVoiceRouter, startVoiceHealthChecks, stopVoiceHealthChecks } from './routes/voice.js';
+import { createProjectsRouter } from './routes/projects.js';
 
 const PORT = parseInt(process.env.SERVER_PORT || '8081', 10);
 
@@ -131,6 +132,7 @@ app.use('/api', createStandupRoutes(contentRoot));
 app.use('/api', createChannelRoutes(contentRoot));
 app.use('/api', createAgentDataRoutes(config, contentRoot, gateway));
 app.use('/api', createVoiceRouter(config));
+app.use('/api', createProjectsRouter(contentRoot));
 
 // Serve built client (production)
 const clientDist = path.join(import.meta.dirname, '../../client/dist');
