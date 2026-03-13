@@ -65,6 +65,8 @@ export function ProjectsView() {
 
   useEffect(() => {
     fetchProjects();
+    const interval = setInterval(fetchProjects, 30_000);
+    return () => clearInterval(interval);
   }, [fetchProjects]);
 
   if (loading) {
@@ -85,9 +87,20 @@ export function ProjectsView() {
 
   return (
     <div className="h-full w-full overflow-auto p-4 md:p-6">
-      <div className="mb-5">
-        <h1 className="text-base font-semibold text-text-primary">Projects</h1>
-        <p className="text-xs text-text-secondary mt-0.5">{projects.length} project{projects.length !== 1 ? 's' : ''} · Click a card to chat with the owner</p>
+      <div className="mb-5 flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-base font-semibold text-text-primary">Projects</h1>
+          <p className="text-xs text-text-secondary mt-0.5">{projects.length} project{projects.length !== 1 ? 's' : ''} · Click a card to chat with the owner</p>
+        </div>
+        <button
+          onClick={() => fetchProjects()}
+          title="Refresh projects"
+          className="shrink-0 p-1.5 rounded text-text-secondary hover:text-text-primary hover:bg-white/10 transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
       </div>
 
       {/* Kanban board — horizontal scroll on desktop, stacked on mobile */}
