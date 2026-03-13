@@ -65,7 +65,7 @@ export function ProjectsView() {
 
   useEffect(() => {
     fetchProjects();
-    const interval = setInterval(fetchProjects, 30_000);
+    const interval = setInterval(fetchProjects, 5 * 60_000);
     return () => clearInterval(interval);
   }, [fetchProjects]);
 
