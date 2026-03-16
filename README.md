@@ -1,15 +1,72 @@
 # OpenClaw MCC Dashboard
 
-A web dashboard for interacting with [OpenClaw](https://openclaw.ai) AI agents. Features an isometric pixel-art office view, real-time chat with streaming responses, file browsing, voice communication, and agent status monitoring. All agent definitions, branding, and content live outside the codebase in a configurable content directory.
+A web dashboard for interacting with [OpenClaw](https://openclaw.ai) AI agents. Features an isometric pixel-art office view, real-time streaming chat, file browsing, voice communication, agent data tabs, cron job management, and project tracking. All agent definitions, branding, and content live outside the codebase in a configurable content directory — no code changes needed to add or reconfigure agents.
 
-**Key features:**
-- Real-time streaming chat with multiple agents via SSE
-- Isometric PixiJS office scene with animated agent sprites
-- File browser for agent-generated documents (inbox/approved/archive)
-- Voice input (Whisper STT) and output (Kokoro/Edge TTS)
-- Agent memory viewer with markdown rendering
-- Custom data tabs with chart/table/markdown renderers
-- SQLite chat persistence with WAL mode
+## Features
+
+### 🏢 Isometric Office
+- PixiJS 8 rendered isometric office scene with animated agent sprites
+- Click any agent at their desk to open a chat session
+- Idle animations, name plates, and customizable desk positions
+
+### 💬 Real-Time Chat
+- Streaming responses via SSE (Server-Sent Events) with live delta rendering
+- Full chat history persisted in SQLite — scroll back as far as you like
+- Interrupt mid-stream with a stop button
+- Retry failed messages directly from the error bubble
+- Auto-reconnect with exponential backoff on connection loss
+
+### 📊 Agent Data Tabs
+Agents can expose contextual data panels alongside their chat. Each tab has a configurable source and renderer:
+
+| Source | Description |
+|--------|-------------|
+| `file:<filename>` | JSON or markdown file from the agent's data directory |
+| `memory` | Agent's memory markdown file |
+| `about` | Static agent bio/description |
+| `crons` | Live cron job list filtered to this agent |
+
+| Renderer | Description |
+|----------|-------------|
+| `default` | Smart JSON renderer — flat arrays become card lists, nested objects become sections |
+| `markdown` | Full GitHub-flavored markdown with table and frontmatter support |
+| `chart` | Chart.js visualizations (bar, line, pie) |
+
+**Card renderer details:** When a tab's JSON is a flat array of objects, each object renders as a card with:
+- `name` / `title` → card heading
+- `status` → color-coded badge (green=complete, blue=active, yellow=pending, etc.)
+- `priority` / `severity` → priority indicator
+- `summary` → full-width prose text below the header
+- `headlines` → expandable list of linked items (type badge + clickable URL)
+- All other fields → compact key-value grid
+
+### 📋 Projects Kanban
+- Kanban board showing all active agent projects across your org
+- Status columns: Backlog → Planning → In Progress → In Review → Done
+- Live data from a `projects.json` file — agents update it, the board auto-refreshes every 5 minutes
+- Manual refresh button for instant updates
+
+### ⏱️ Cron Job Management
+- View all scheduled cron jobs across all agents
+- Click any cron entry to see run history, last status, next run time, and full payload
+- Filter by agent, status, or search by name
+- Color-coded run status (ok / error / timeout) with consecutive error counts
+
+### 📁 File Browser
+- Browse agent-generated documents organized in inbox / approved / archive folders
+- Markdown preview with GFM table rendering
+- File approval workflow — move files between folders from the UI
+
+### 🎙️ Voice
+- Push-to-talk voice input via Whisper STT (local or server)
+- Text-to-speech responses via Kokoro TTS or Edge TTS (cloud fallback)
+- Per-agent voice configuration
+
+### 🧠 Memory Viewer
+- Read each agent's memory file directly in the dashboard
+- Full markdown rendering
+
+---
 
 ## Prerequisites
 
@@ -20,6 +77,8 @@ A web dashboard for interacting with [OpenClaw](https://openclaw.ai) AI agents. 
   xcode-select --install
   ```
 
+---
+
 ## Quick Start
 
 ```bash
@@ -28,14 +87,14 @@ cd openclaw-mcc
 npm install
 
 # Create your content directory and config
-mkdir -p ~/.openclaw
 cp config.yaml.example ~/.openclaw/config.yaml   # Edit with your agents
-# Or create config.yaml from scratch — see Configuration below
 
 npm run dev
 ```
 
 The client runs on `http://localhost:3001` and the server on `http://localhost:8081`.
+
+---
 
 ## Configuration
 
@@ -46,7 +105,7 @@ All configuration lives under `CONTENT_ROOT` (default: `~/.openclaw`).
 ```yaml
 branding:
   name: "My AI Office"        # Dashboard title
-  shortName: "MCC"             # Abbreviated name
+  shortName: "MCC"
 
 gateway:
   url: "http://127.0.0.1:18789"
@@ -54,40 +113,67 @@ gateway:
 
 agents:
   researcher:
-    name: Ada                  # Display name
-    fullName: Ada Lovelace     # Optional full name
-    role: Research Lead        # Job title shown in UI
-    emoji: "🔬"                # Fallback when no sprite
-    sprite: ada                # Sprite sheet name in assets/ (optional)
+    name: Ada                   # Display name
+    fullName: Ada Lovelace      # Optional full name
+    role: Research Lead         # Job title shown in UI
+    emoji: "🔬"                 # Fallback avatar when no sprite
+    sprite: ada                 # Sprite sheet name in assets/ (optional)
     color:
-      from: "#8b5cf6"         # Gradient start (hex)
-      to: "#7c3aed"           # Gradient end (hex)
-    channel: "#research"       # Channel identifier
+      from: "#8b5cf6"          # Card gradient start
+      to: "#7c3aed"            # Card gradient end
+    channel: "#research"        # Channel identifier
     greeting: "What should we investigate?"
-    quote: "The more I study, the more I know."  # Optional
+    quote: "The more I study, the more I know."
     voice: "en-US-AriaNeural"  # Edge TTS voice (optional)
     position:
-      zone: desk               # Office zone
-      x: 3                     # Grid position
+      zone: desk
+      x: 3
       y: 2
     tabs:
       - id: findings
         label: Findings
-        icon: clipboard
-        source: "file:findings.json"     # JSON file in CONTENT_ROOT/data/
-      - id: metrics
-        label: Metrics
-        icon: chart
-        source: "file:metrics.json"
-        renderer: chart                  # chart | table | markdown | default
+        source: "file:findings.json"      # Looks up CONTENT_ROOT/workspace/agents/researcher/findings.json
+      - id: reports
+        label: Reports
+        source: "file:reports.json"
+        renderer: markdown
       - id: memory
         label: Memory
-        icon: brain
-        source: memory                   # Agent's memory file
+        source: memory
         renderer: markdown
+      - id: jobs
+        label: Jobs
+        source: crons                     # Live cron jobs for this agent
 ```
 
-**Agent keys** (e.g., `researcher`) are used as session identifiers when communicating with the Gateway.
+**Tab file lookup order:**
+1. `CONTENT_ROOT/workspace/agents/<agentKey>/<filename>`
+2. `CONTENT_ROOT/data/<filename>`
+
+**Agent keys** (e.g., `researcher`) must match the session identifier used by OpenClaw Gateway.
+
+### projects.json (optional)
+
+Powers the Projects Kanban board. Agents update this file; the UI auto-refreshes:
+
+```json
+[
+  {
+    "id": "my-app",
+    "name": "My App",
+    "owner": "marcus",
+    "status": "in-progress",
+    "summary": "Building the core feature set",
+    "nextStep": "Complete authentication flow",
+    "blocker": null,
+    "lastUpdated": "2026-03-16"
+  }
+]
+```
+
+Valid statuses: `backlog`, `planning`, `in-progress`, `in-review`, `done`
+
+Place at `CONTENT_ROOT/workspace/docs/projects/projects.json`.
 
 ### openclaw.json (optional)
 
@@ -106,34 +192,81 @@ Maps agents to LLM models for display in the chat header:
 }
 ```
 
-Model IDs use `provider/model` format. The dashboard auto-formats them for display (e.g., `anthropic/claude-sonnet-4-6` → "Sonnet 4.6").
+---
 
-## Content Directory
-
-`CONTENT_ROOT` (default `~/.openclaw`) holds all runtime data. The server auto-creates this structure on first start:
+## Content Directory Layout
 
 ```
-~/.openclaw/
-├── config.yaml          # You create this (required)
-├── openclaw.json        # You create this (optional)
-├── data/                # JSON data files referenced by agent tabs
-│   └── token-usage/     # Auto-generated token tracking
-├── files/               # Agent-generated documents
-│   ├── inbox/           # New files for review
-│   ├── approved/        # Approved files
-│   └── archive/         # Archived files
-├── databases/           # SQLite chat history (auto-created)
-├── memory/
-│   └── agents/          # Per-agent memory markdown files
-└── assets/              # Custom sprite sheets (optional)
+~/.openclaw/                        # CONTENT_ROOT
+├── config.yaml                     # Required — agents, gateway, branding
+├── openclaw.json                   # Optional — model mappings
+├── workspace/
+│   ├── agents/
+│   │   └── <agentKey>/
+│   │       ├── <tabfile>.json      # Data files for agent tabs (file: source)
+│   │       └── memory.md          # Agent memory (memory source)
+│   └── docs/
+│       └── projects/
+│           └── projects.json       # Kanban board data
+├── data/                           # Fallback path for tab files
+├── files/                          # Agent-generated documents
+│   ├── inbox/
+│   ├── approved/
+│   └── archive/
+├── databases/
+│   └── chat.db                     # SQLite chat history (auto-created)
+└── assets/                         # Custom sprite sheets (optional)
 ```
+
+---
+
+## Agent Tab Data Formats
+
+### Card list (recommended for structured data)
+
+Return a **flat array of objects** from your tab's JSON file. Each object becomes a card:
+
+```json
+[
+  {
+    "name": "Competitor A",
+    "status": "active",
+    "summary": "Full-width prose text that describes this item in detail. No truncation in the UI.",
+    "items": 5,
+    "updated": "Mar 16, 2026",
+    "headlines": [
+      { "title": "Competitor A launches new product", "url": "https://...", "type": "announcement" },
+      { "title": "Coverage in industry press", "url": "https://...", "type": "news" }
+    ]
+  }
+]
+```
+
+The `headlines` array renders as an expandable section — click "▼ N items" on the card to expand.
+
+### Nested object (key-value sections)
+
+Return a plain object. Nested objects become labeled sections, scalar values become key-value rows:
+
+```json
+{
+  "budget": { "allocated": 50000, "spent": 32000, "remaining": 18000 },
+  "status": "on track"
+}
+```
+
+### Markdown
+
+Set `renderer: markdown` and return a string (or use `source: memory`). Full GFM support including tables.
+
+---
 
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `CONTENT_ROOT` | `~/.openclaw` | Path to content directory |
-| `SERVER_PORT` | `8081` | Server port |
+| `SERVER_PORT` | `8081` | Server listen port |
 | `CLIENT_PORT` | `3001` | Vite dev server port |
 | `GATEWAY_PORT` | `18789` | OpenClaw Gateway port (overrides config.yaml) |
 | `GATEWAY_TOKEN` | — | Gateway auth token (overrides config.yaml) |
@@ -144,9 +277,9 @@ Model IDs use `provider/model` format. The dashboard auto-formats them for displ
 
 Copy `.env.example` to `.env` to set these locally.
 
-## Production Deployment
+---
 
-Build and serve both client and server from port 8081:
+## Production Deployment
 
 ```bash
 npm run build
@@ -190,24 +323,26 @@ Create `~/Library/LaunchAgents/com.openclaw.mcc.plist`:
 ```
 
 ```bash
-# Load the service
 launchctl load ~/Library/LaunchAgents/com.openclaw.mcc.plist
 
-# After rebuilding, restart with:
+# After rebuilding:
 npm run build && launchctl kickstart -k gui/$(id -u)/com.openclaw.mcc
 ```
 
-**Note:** Update the `node` path if using a version manager (nvm, fnm, Homebrew). Hardcoded paths break on upgrades — use `which node` to find your current path.
+> **Tip:** Use `which node` to find the correct node path — hardcoded paths break when updating Node via nvm/fnm/Homebrew.
+
+---
 
 ## Development
 
 ```bash
-npm run dev                  # Both client + server with hot reload
-npm run dev -w packages/client   # Client only (port 3001)
-npm run dev -w packages/server   # Server only (port 8081)
+npm run dev                          # Both client + server with hot reload
+npm run dev -w packages/client       # Client only (port 3001, proxies to server)
+npm run dev -w packages/server       # Server only (port 8081)
 
-npm run test:server          # Vitest unit tests
-npm run test:e2e             # Playwright e2e tests (from packages/client)
+npm run build                        # Production build
+npm run test:server                  # Vitest unit tests
+npm run test:e2e                     # Playwright e2e tests
 ```
 
 ### Project Structure
@@ -215,36 +350,49 @@ npm run test:e2e             # Playwright e2e tests (from packages/client)
 ```
 openclaw-mcc/
 ├── packages/
-│   ├── client/              # Vite + React 19 + Tailwind v4 + PixiJS 8
+│   ├── client/                      # Vite + React 19 + Tailwind v4 + PixiJS 8
 │   │   ├── src/
-│   │   │   ├── canvas/      # Isometric office scene
-│   │   │   ├── components/  # React UI (chat, sidebar, panels)
-│   │   │   ├── hooks/       # useChat, useSSE, useConfig, useVoice
-│   │   │   ├── stores/      # Zustand state management
-│   │   │   └── layouts/     # Responsive dashboard layout
-│   │   └── e2e/             # Playwright tests
-│   └── server/              # Express 5 + SQLite + WebSocket
+│   │   │   ├── canvas/              # Isometric office scene (PixiJS)
+│   │   │   ├── components/
+│   │   │   │   ├── AgentInfoTabs.tsx   # Data tabs + card/JSON renderer
+│   │   │   │   ├── ChatPanel.tsx       # Chat UI + streaming
+│   │   │   │   ├── ChatMessage.tsx     # Message rendering (markdown + tables)
+│   │   │   │   ├── CronDetailPanel.tsx # Cron job detail drawer
+│   │   │   │   ├── ProjectsView.tsx    # Kanban board
+│   │   │   │   └── StandupWidget.tsx   # Agent standup summary
+│   │   │   ├── hooks/
+│   │   │   │   ├── useChat.ts          # Send/retry/load with safety-net poll
+│   │   │   │   ├── useSSE.ts           # SSE with auto-reconnect + history reload
+│   │   │   │   ├── useConfig.ts        # Agent config loader
+│   │   │   │   └── useVoice.ts         # STT/TTS integration
+│   │   │   └── stores/
+│   │   │       ├── chatStore.ts        # Message state + stream buffer
+│   │   │       └── agentStore.ts       # Agent config + error state
+│   │   └── e2e/                     # Playwright tests
+│   └── server/                      # Express 5 + SQLite + WebSocket
 │       └── src/
-│           ├── gateway/     # WebSocket client to OpenClaw Gateway
-│           ├── services/    # Chat (SSE streaming), voice (TTS/STT)
-│           ├── routes/      # REST API endpoints
-│           └── db.ts        # SQLite with WAL mode
-└── docs/plans/              # Design documents
+│           ├── gateway/             # WebSocket client to OpenClaw Gateway
+│           ├── services/
+│           │   ├── chat-streaming.ts   # SSE broadcast service
+│           │   └── voice.ts            # TTS/STT service
+│           ├── routes/              # REST API endpoints
+│           └── db.ts                # SQLite (WAL mode, auto-migration)
+└── docs/plans/                      # Design documents
 ```
+
+---
 
 ## Voice Services (Optional)
 
-Voice features require external services. All are optional — the dashboard works without them.
+**Speech-to-text** — one of:
+- [Whisper.cpp server](https://github.com/ggerganov/whisper.cpp) on port 8090 *(recommended)*
+- Whisper CLI binary
 
-**Speech-to-text** — requires one of:
-- [Whisper.cpp server](https://github.com/ggerganov/whisper.cpp) running on port 8090 (recommended)
-- Whisper CLI binary installed locally
+**Text-to-speech** — in priority order:
+1. [Kokoro TTS](https://github.com/remsky/Kokoro-FastAPI) — local neural TTS, no internet required
+2. Edge TTS — Microsoft's free cloud TTS, no setup needed
 
-**Text-to-speech** — uses one of (in priority order):
-1. [Kokoro TTS](https://github.com/remsky/Kokoro-FastAPI) — local neural TTS
-2. Edge TTS — Microsoft's free cloud TTS (no setup, works out of the box)
-
-Set the corresponding environment variables to configure service URLs and binary paths. See the Environment Variables table above.
+---
 
 ## License
 
