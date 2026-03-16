@@ -97,17 +97,33 @@ function formatLabel(key: string): string {
   return key.replace(/([A-Z])/g, ' $1').replace(/[_-]/g, ' ').replace(/^\w/, c => c.toUpperCase());
 }
 
+interface HeadlineItem {
+  title: string;
+  url: string;
+  type?: string;
+}
+
+const HEADLINE_SKIP_KEYS = new Set([...Array.from(new Set(['id', 'title', 'name', 'item', 'type', 'status', 'priority', 'severity', 'repo', 'channel', 'focus', 'assignee', 'reporter', 'author', 'lead', 'day'])), 'headlines', 'latest', 'summary']);
+
 function CardItem({ obj, onSelect }: { obj: Record<string, unknown>; onSelect?: (id: string) => void }) {
+  const [expanded, setExpanded] = useState(false);
   const title = findTitle(obj);
   const subtitle = findSubtitle(obj);
   const status = typeof obj.status === 'string' ? obj.status : null;
   const priority = typeof obj.priority === 'string' ? obj.priority : null;
   const severity = typeof obj.severity === 'string' ? obj.severity : null;
   const id = obj.id != null ? String(obj.id) : null;
+  const headlines = Array.isArray(obj.headlines) ? (obj.headlines as HeadlineItem[]) : null;
+  const summary = typeof obj.summary === 'string' ? obj.summary : null;
 
   const extraFields = Object.entries(obj).filter(
-    ([k, v]) => !SKIP_KEYS.has(k) && v != null && v !== '',
+    ([k, v]) => !HEADLINE_SKIP_KEYS.has(k) && !SKIP_KEYS.has(k) && v != null && v !== '',
   );
+
+  const handleExpand = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpanded(prev => !prev);
+  };
 
   return (
     <div
@@ -127,14 +143,51 @@ function CardItem({ obj, onSelect }: { obj: Record<string, unknown>; onSelect?: 
           <div className="text-sm text-text-primary mt-0.5">{title}</div>
           {subtitle && <div className="text-xs text-text-secondary mt-0.5">{subtitle}</div>}
         </div>
-        {status && <StatusBadge status={status} />}
+        <div className="flex items-center gap-2 shrink-0">
+          {status && <StatusBadge status={status} />}
+          {headlines && headlines.length > 0 && (
+            <button
+              onClick={handleExpand}
+              className="text-[10px] text-text-secondary hover:text-accent transition-colors px-1.5 py-0.5 rounded border border-white/10 hover:border-accent/40"
+            >
+              {expanded ? '▲ Hide' : `▼ ${headlines.length} items`}
+            </button>
+          )}
+        </div>
       </div>
+      {summary && (
+        <div className="mt-2 pt-2 border-t border-white/5">
+          <p className="text-[11px] text-text-secondary leading-relaxed">{summary}</p>
+        </div>
+      )}
       {extraFields.length > 0 && (
         <div className="mt-2 pt-2 border-t border-white/5 grid grid-cols-2 gap-x-3 gap-y-1">
           {extraFields.map(([k, v]) => (
             <div key={k} className="text-[11px]">
               <span className="text-text-secondary">{formatLabel(k)}: </span>
               <span className="text-text-primary">{formatValue(v)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {expanded && headlines && headlines.length > 0 && (
+        <div className="mt-2 pt-2 border-t border-white/5 space-y-1.5">
+          {headlines.map((h, i) => (
+            <div key={i} className="flex items-start gap-2">
+              {h.type && (
+                <span className="text-[9px] font-medium uppercase tracking-wide text-text-secondary bg-white/5 px-1 py-0.5 rounded shrink-0 mt-0.5">
+                  {h.type}
+                </span>
+              )}
+              <a
+                href={h.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={e => e.stopPropagation()}
+                className="text-[11px] text-accent hover:underline leading-snug"
+              >
+                {h.title}
+              </a>
             </div>
           ))}
         </div>
