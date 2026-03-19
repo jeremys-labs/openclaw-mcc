@@ -96,6 +96,31 @@ export function createFileRoutes(contentRoot: string): Router {
       res.status(404).json({ error: 'File not found' });
       return;
     }
+    const ext = path.extname(filePath).toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      '.md': 'text/plain; charset=utf-8',
+      '.txt': 'text/plain; charset=utf-8',
+      '.json': 'application/json; charset=utf-8',
+      '.html': 'text/html; charset=utf-8',
+      '.htm': 'text/html; charset=utf-8',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.gif': 'image/gif',
+      '.svg': 'image/svg+xml',
+      '.webp': 'image/webp',
+      '.pdf': 'application/pdf',
+      '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      '.ppt': 'application/vnd.ms-powerpoint',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.doc': 'application/msword',
+      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.xls': 'application/vnd.ms-excel',
+      '.zip': 'application/zip',
+      '.csv': 'text/csv; charset=utf-8',
+    };
+    const contentType = mimeTypes[ext] || 'application/octet-stream';
+    res.setHeader('Content-Type', contentType);
     res.sendFile(filePath);
   });
 
