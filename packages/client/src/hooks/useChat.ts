@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { useChatStore } from '../stores/chatStore';
+import type { ChatAttachment } from '../types/attachments';
 
 const HISTORY_PAGE_SIZE = 100;
 
@@ -29,30 +30,42 @@ export function useChat(agentKey: string) {
   // Track the highest seq we've seen for this agent — used by the safety-net poll
   const latestSeqRef = useRef<Record<string, number>>({});
 
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, attachments?: ChatAttachment[]) => {
     const idempotencyKey = generateUUID();
     const seq = Date.now();
+
+    // Build display content: if there are attachments, note them
+    const hasAttachments = attachments && attachments.length > 0;
+    const displayContent = content || (hasAttachments
+      ? `📎 ${attachments!.length} file${attachments!.length > 1 ? 's' : ''} attached`
+      : '');
+
     addMessage(agentKey, {
       seq,
       role: 'user',
-      content,
+      content: displayContent,
       timestamp: Date.now(),
     });
     setDraftAction(agentKey, '');
+
+    // Strip previewUrl (client-only) before sending
+    const wireAttachments = attachments?.map(({ previewUrl: _p, sizeBytes: _s, ...a }) => a);
 
     try {
       const res = await fetch(`/api/chat/${agentKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, idempotencyKey }),
+        body: JSON.stringify({
+          content,
+          idempotencyKey,
+          ...(wireAttachments && wireAttachments.length > 0 ? { attachments: wireAttachments } : {}),
+        }),
       });
       if (!res.ok) {
         throw new Error(`Server responded with ${res.status}`);
       }
 
-      // Safety net: if SSE missed the response (e.g. mobile browser suspended the
-      // connection while keyboard was open), fetch only new messages since the last
-      // known seq. The store's dedup logic prevents double-rendering if SSE worked.
+      // Safety-net poll (unchanged)
       setTimeout(async () => {
         try {
           const since = latestSeqRef.current[agentKey] ?? 0;
@@ -63,7 +76,6 @@ export function useChat(agentKey: string) {
             newMsgs.forEach((m: { seq: number; role: 'user' | 'assistant'; content: string; timestamp: number }) => {
               store.addMessage(agentKey, m);
             });
-            // Update latest seq tracker
             const maxSeq = Math.max(...newMsgs.map((m: { seq: number }) => m.seq));
             latestSeqRef.current[agentKey] = Math.max(latestSeqRef.current[agentKey] ?? 0, maxSeq);
           }
