@@ -15,6 +15,13 @@ interface ChatDeps {
 
 const SYSTEM_MESSAGE_PATTERNS = /^(ANNOUNCE_SKIP|NO_REPLY|NO_?|SKIP|ACK|HEARTBEAT|PING|PONG)$/i;
 
+interface ChatAttachmentInput {
+  type?: string;
+  mimeType?: string;
+  fileName?: string;
+  content: string; // base64
+}
+
 function getAgentKey(req: Request): string {
   const key = req.params.agentKey;
   return Array.isArray(key) ? key[0] : key;
@@ -42,13 +49,6 @@ export function createChatRouter({ config, db, gateway, streaming }: ChatDeps): 
   router.post('/chat/:agentKey', async (req: Request, res: Response) => {
     const agentKey = getAgentKey(req);
     if (!validateAgent(config, agentKey, res)) return;
-
-    interface ChatAttachmentInput {
-      type?: string;
-      mimeType?: string;
-      fileName?: string;
-      content: string; // base64
-    }
 
     const { content, idempotencyKey, metadata, attachments } = req.body as {
       content?: string;
