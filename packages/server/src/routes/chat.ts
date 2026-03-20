@@ -43,20 +43,31 @@ export function createChatRouter({ config, db, gateway, streaming }: ChatDeps): 
     const agentKey = getAgentKey(req);
     if (!validateAgent(config, agentKey, res)) return;
 
-    const { content, idempotencyKey, metadata } = req.body as {
+    interface ChatAttachmentInput {
+      type?: string;
+      mimeType?: string;
+      fileName?: string;
+      content: string; // base64
+    }
+
+    const { content, idempotencyKey, metadata, attachments } = req.body as {
       content?: string;
       idempotencyKey?: string;
       metadata?: Record<string, unknown>;
+      attachments?: ChatAttachmentInput[];
     };
 
-    if (!content || typeof content !== 'string' || content.trim().length === 0) {
-      res.status(400).json({ error: 'content is required and must be a non-empty string' });
+    const hasText = typeof content === 'string' && content.trim().length > 0;
+    const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
+
+    if (!hasText && !hasAttachments) {
+      res.status(400).json({ error: 'content or attachments required' });
       return;
     }
 
     const timestamp = Date.now();
     const key = idempotencyKey || crypto.randomUUID();
-    const result = db.addMessage(agentKey, 'user', content, timestamp, key, metadata);
+    const result = db.addMessage(agentKey, 'user', content ?? '', timestamp, key, metadata);
 
     if (result.duplicate) {
       res.json({ seq: result.seq, duplicate: true });
@@ -70,8 +81,9 @@ export function createChatRouter({ config, db, gateway, streaming }: ChatDeps): 
       if (gateway.isConnected) {
         await gateway.request('chat.send', {
           sessionKey,
-          message: content,
+          message: content ?? '',
           idempotencyKey: key,
+          ...(hasAttachments ? { attachments } : {}),
         });
       }
     } catch (err) {
