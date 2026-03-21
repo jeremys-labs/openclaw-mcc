@@ -1,4 +1,5 @@
-import { memo } from 'react';
+import { memo, useState, useCallback } from 'react';
+import { Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -38,6 +39,37 @@ function normalizeMarkdownTables(content: string): string {
   return result;
 }
 
+/**
+ * Strip common markdown syntax to produce clean plain text for clipboard copy.
+ */
+function stripMarkdown(content: string): string {
+  return content
+    // Fenced code blocks — keep the code content, drop the fences
+    .replace(/```[\w]*\n?([\s\S]*?)```/g, '$1')
+    // Inline code
+    .replace(/`([^`]+)`/g, '$1')
+    // Headers
+    .replace(/^#{1,6}\s+/gm, '')
+    // Bold and italic (**, __, *, _)
+    .replace(/(\*\*|__)(.*?)\1/g, '$2')
+    .replace(/(\*|_)(.*?)\1/g, '$2')
+    // Links: [text](url) → text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    // Images: ![alt](url) → alt
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+    // Blockquotes
+    .replace(/^>\s?/gm, '')
+    // Unordered list markers
+    .replace(/^[-*+]\s+/gm, '')
+    // Ordered list markers
+    .replace(/^\d+\.\s+/gm, '')
+    // Horizontal rules
+    .replace(/^[-*_]{3,}\s*$/gm, '')
+    // Collapse multiple blank lines to single
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 interface Props {
   role: 'user' | 'assistant';
   content: string;
@@ -49,6 +81,14 @@ interface Props {
 
 export const ChatMessage = memo(function ChatMessage({ role, content, agentName, streaming, error, onRetry }: Props) {
   const isUser = role === 'user';
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(stripMarkdown(content)).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [content]);
 
   if (error) {
     return (
@@ -72,16 +112,29 @@ export const ChatMessage = memo(function ChatMessage({ role, content, agentName,
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
       <div
-        className={`max-w-[80%] rounded-lg px-4 py-2 overflow-hidden ${
+        className={`relative max-w-[80%] rounded-lg px-4 py-2 overflow-hidden ${
           isUser
             ? 'bg-accent text-white'
             : 'bg-surface-overlay text-text-primary'
         }`}
       >
+        {!isUser && (
+          <button
+            onClick={handleCopy}
+            className="absolute top-2 right-2 p-1 rounded text-text-secondary hover:text-text-primary transition-colors"
+            aria-label="Copy message"
+          >
+            {copied ? (
+              <Check className="w-4 h-4 text-green-400" />
+            ) : (
+              <Copy className="w-4 h-4" />
+            )}
+          </button>
+        )}
         {!isUser && agentName && (
           <div className="text-xs text-text-secondary mb-1 font-medium">{agentName}</div>
         )}
-        <div className="prose prose-invert prose-sm max-w-none break-words [overflow-wrap:anywhere] [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:break-all">
+        <div className={`prose prose-invert prose-sm max-w-none break-words [overflow-wrap:anywhere] [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:break-all${!isUser ? ' pr-6' : ''}`}>
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizeMarkdownTables(content)}</ReactMarkdown>
         </div>
         {streaming && (
