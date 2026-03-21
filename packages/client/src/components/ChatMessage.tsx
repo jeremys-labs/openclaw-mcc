@@ -70,6 +70,26 @@ function stripMarkdown(content: string): string {
     .trim();
 }
 
+/**
+ * Fallback copy using execCommand for non-secure contexts (HTTP on local network).
+ * navigator.clipboard is only available in secure contexts (HTTPS/localhost).
+ */
+function execCommandCopy(text: string): void {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  ta.style.pointerEvents = 'none';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try {
+    document.execCommand('copy');
+  } finally {
+    document.body.removeChild(ta);
+  }
+}
+
 interface Props {
   role: 'user' | 'assistant';
   content: string;
@@ -84,10 +104,23 @@ export const ChatMessage = memo(function ChatMessage({ role, content, agentName,
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(stripMarkdown(content)).then(() => {
+    const text = stripMarkdown(content);
+    const finish = () => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    });
+    };
+
+    // navigator.clipboard requires a secure context (HTTPS/localhost).
+    // Fall back to execCommand for HTTP (e.g. local network iPad access).
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(finish).catch(() => {
+        execCommandCopy(text);
+        finish();
+      });
+    } else {
+      execCommandCopy(text);
+      finish();
+    }
   }, [content]);
 
   if (error) {
