@@ -164,6 +164,21 @@ export function useChat(agentKey: string) {
     await fetch(`/api/chat/${agentKey}/interrupt`, { method: 'POST' });
   }, [agentKey]);
 
+  const sendBtw = useCallback(async (question: string) => {
+    try {
+      const res = await fetch(`/api/chat/${agentKey}/btw`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question }),
+      });
+      if (!res.ok) {
+        throw new Error(`Server responded with ${res.status}`);
+      }
+    } catch (err) {
+      console.error('BTW send failed:', err);
+    }
+  }, [agentKey]);
+
   const setDraft = useCallback((text: string) => {
     setDraftAction(agentKey, text);
   }, [agentKey, setDraftAction]);
@@ -172,6 +187,7 @@ export function useChat(agentKey: string) {
     draft,
     setDraft,
     sendMessage,
+    sendBtw,
     retryMessage,
     loadHistory,
     loadOlderMessages,

@@ -71,6 +71,10 @@ export class ChatStreamService extends EventEmitter {
     this.broadcast(agent, 'message.aborted', { messageId, reason });
   }
 
+  broadcastSideResult(agent: string, content: string): void {
+    this.broadcast(agent, 'message.side_result', { content });
+  }
+
   broadcastContextUpdate(agent: string, tokens: number, maxTokens: number): void {
     const percentUsed = maxTokens > 0 ? Math.round((tokens / maxTokens) * 100) : 0;
     this.broadcast(agent, 'context.update', { tokens, maxTokens, percentUsed });

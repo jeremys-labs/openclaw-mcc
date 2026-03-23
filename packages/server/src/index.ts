@@ -77,6 +77,23 @@ function isSystemMessage(text: string): boolean {
 gateway.on('event', (frame: Record<string, unknown>) => {
   const event = frame.event as string;
 
+  if (event === 'chat.side_result') {
+    const payload = frame.payload as Record<string, unknown>;
+    if (!payload) return;
+
+    const sessionKey = payload.sessionKey as string;
+    const agent = sessionToAgent[sessionKey];
+    if (!agent) return;
+
+    const message = payload.message as Record<string, unknown> | undefined;
+    if (message) {
+      const text = extractMessageText(message);
+      if (text) {
+        streaming.broadcastSideResult(agent, text);
+      }
+    }
+  }
+
   if (event === 'chat') {
     const payload = frame.payload as Record<string, unknown>;
     if (!payload) return;

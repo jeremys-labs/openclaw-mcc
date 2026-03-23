@@ -134,6 +134,32 @@ export function createChatRouter({ config, db, gateway, streaming }: ChatDeps): 
     res.json({ cleared: true });
   });
 
+  // BTW — ephemeral side question (not saved to history)
+  router.post('/chat/:agentKey/btw', async (req: Request, res: Response) => {
+    const agentKey = getAgentKey(req);
+    if (!validateAgent(config, agentKey, res)) return;
+
+    const { question } = req.body as { question?: string };
+    if (!question || !question.trim()) {
+      res.status(400).json({ error: 'question required' });
+      return;
+    }
+
+    const sessionKey = `agent:${agentKey}:webchat:user`;
+
+    try {
+      if (gateway.isConnected) {
+        await gateway.request('chat.btw', { sessionKey, question: question.trim() });
+        res.json({ ok: true });
+      } else {
+        res.status(503).json({ error: 'Gateway not connected' });
+      }
+    } catch (err) {
+      console.error(`Gateway btw failed for ${agentKey}:`, (err as Error).message);
+      res.status(502).json({ error: 'Gateway request failed', detail: (err as Error).message });
+    }
+  });
+
   // Interrupt/abort response
   router.post('/chat/:agentKey/interrupt', async (req: Request, res: Response) => {
     const agentKey = getAgentKey(req);

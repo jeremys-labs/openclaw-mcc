@@ -9,6 +9,7 @@ interface Props {
   value: string;
   onChange: (text: string) => void;
   onSend: (text: string, attachments: ChatAttachment[]) => void;
+  onBtw?: (question: string) => void;
   onInterrupt?: () => void;
   isStreaming: boolean;
   placeholder?: string;
@@ -46,7 +47,7 @@ async function filesToAttachments(files: FileList | File[]): Promise<ChatAttachm
   );
 }
 
-export function ChatInput({ value, onChange, onSend, onInterrupt, isStreaming, placeholder }: Props) {
+export function ChatInput({ value, onChange, onSend, onBtw, onInterrupt, isStreaming, placeholder }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -109,25 +110,33 @@ export function ChatInput({ value, onChange, onSend, onInterrupt, isStreaming, p
     if (overLimit) return;
     const text = value.trim();
     if (!text && attachments.length === 0) return;
+
+    // /btw prefix: route to side question, don't add to chat history
+    const btwMatch = text.match(/^\/btw\s+(.+)/si);
+    if (btwMatch && onBtw) {
+      onBtw(btwMatch[1].trim());
+      onChange('');
+      setAttachments([]);
+      setSizeError(null);
+      return;
+    }
+
     onSend(text, attachments);
     setAttachments([]);
     setSizeError(null);
     textareaRef.current?.blur();
-  }, [value, attachments, overLimit, onSend]);
+  }, [value, attachments, overLimit, onSend, onBtw, onChange]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Enter') {
         if (e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
         e.preventDefault();
-        if (isStreaming && onInterrupt) {
-          onInterrupt();
-        } else {
-          doSend();
-        }
+        // Enter always sends — use the Stop button to interrupt
+        doSend();
       }
     },
-    [doSend, onInterrupt, isStreaming]
+    [doSend]
   );
 
   // Drag and drop
@@ -150,6 +159,7 @@ export function ChatInput({ value, onChange, onSend, onInterrupt, isStreaming, p
     }
   }, [addAttachments]);
 
+  const isBtw = /^\/btw\s/i.test(value);
   const canSend = !overLimit && (value.trim().length > 0 || attachments.length > 0);
 
   return (
@@ -213,21 +223,34 @@ export function ChatInput({ value, onChange, onSend, onInterrupt, isStreaming, p
           className="flex-1 bg-surface-overlay text-text-primary rounded-lg px-3 py-2 resize-none text-sm focus:outline-none focus:ring-1 focus:ring-accent"
         />
 
+        {/* Stop button — only active while streaming */}
         <button
-          onClick={() => {
-            if (isStreaming && onInterrupt) onInterrupt();
-            else doSend();
-          }}
-          disabled={!isStreaming && !canSend}
-          className={`px-4 py-2 rounded-lg text-sm font-medium shrink-0 transition-colors ${
+          onClick={() => onInterrupt?.()}
+          disabled={!isStreaming}
+          title="Stop response"
+          className={`px-3 py-2 rounded-lg text-sm font-medium shrink-0 transition-colors ${
             isStreaming
               ? 'bg-red-600 hover:bg-red-700 text-white'
-              : canSend
-              ? 'bg-accent hover:bg-accent/80 text-white'
+              : 'bg-red-600/20 text-red-400/40 cursor-not-allowed'
+          }`}
+        >
+          Stop
+        </button>
+
+        {/* Send button — always active when there's content */}
+        <button
+          onClick={doSend}
+          disabled={!canSend}
+          title={isBtw ? 'Ask side question (/btw)' : 'Send message'}
+          className={`px-4 py-2 rounded-lg text-sm font-medium shrink-0 transition-colors ${
+            canSend
+              ? isBtw
+                ? 'bg-accent/70 hover:bg-accent text-white'
+                : 'bg-accent hover:bg-accent/80 text-white'
               : 'bg-accent/40 text-white/50 cursor-not-allowed'
           }`}
         >
-          {isStreaming ? 'Stop' : 'Send'}
+          {isBtw ? 'Ask' : 'Send'}
         </button>
       </div>
     </div>

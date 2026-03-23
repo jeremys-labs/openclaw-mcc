@@ -13,6 +13,8 @@ export function useSSE(agentKey: string | null) {
   const finalizeStream = useChatStore((s) => s.finalizeStream);
   const setStreaming = useChatStore((s) => s.setStreaming);
   const setMessages = useChatStore((s) => s.setMessages);
+  const setSideResult = useChatStore((s) => s.setSideResult);
+  const sideResultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!agentKey) return;
@@ -71,6 +73,17 @@ export function useSSE(agentKey: string | null) {
         setStreaming(agentKey!, false);
       });
 
+      es.addEventListener('message.side_result', (e) => {
+        const data = JSON.parse(e.data);
+        retryCountRef.current = 0;
+        setSideResult(agentKey!, data.content);
+        // Auto-dismiss after 30 seconds if not manually dismissed
+        if (sideResultTimerRef.current) clearTimeout(sideResultTimerRef.current);
+        sideResultTimerRef.current = setTimeout(() => {
+          setSideResult(agentKey!, null);
+        }, 30_000);
+      });
+
       es.onerror = () => {
         es.close();
         eventSourceRef.current = null;
@@ -95,10 +108,14 @@ export function useSSE(agentKey: string | null) {
         clearTimeout(retryTimerRef.current);
         retryTimerRef.current = null;
       }
+      if (sideResultTimerRef.current) {
+        clearTimeout(sideResultTimerRef.current);
+        sideResultTimerRef.current = null;
+      }
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
     };
-  }, [agentKey, appendStreamBuffer, finalizeStream, setStreaming, setMessages]);
+  }, [agentKey, appendStreamBuffer, finalizeStream, setStreaming, setMessages, setSideResult]);
 }

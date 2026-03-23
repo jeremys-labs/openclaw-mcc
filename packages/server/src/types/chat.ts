@@ -14,4 +14,5 @@ export type SSEEventType =
   | 'message.final'
   | 'message.error'
   | 'message.aborted'
+  | 'message.side_result'
   | 'context.update';

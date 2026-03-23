@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
+import { BtwOverlay } from './BtwOverlay';
 import { VoiceMode } from './VoiceMode';
 import { useChat } from '../hooks/useChat';
 import { useVoice } from '../hooks/useVoice';
@@ -17,13 +18,15 @@ interface Props {
 }
 
 export function ChatPanel({ agentKey }: Props) {
-  const { draft, setDraft, sendMessage, retryMessage, loadHistory, loadOlderMessages, interrupt } = useChat(agentKey);
+  const { draft, setDraft, sendMessage, sendBtw, retryMessage, loadHistory, loadOlderMessages, interrupt } = useChat(agentKey);
   const { speak } = useVoice();
   const messages = useChatStore((s) => s.messages[agentKey] ?? EMPTY_MESSAGES);
   const isStreaming = useChatStore((s) => !!s.streaming[agentKey]);
   const streamBuffer = useChatStore((s) => s.streamBuffer[agentKey] ?? '');
   const hasOlderMessages = useChatStore((s) => !!s.hasOlderMessages[agentKey]);
   const loadingOlder = useChatStore((s) => !!s.loadingOlder[agentKey]);
+  const sideResult = useChatStore((s) => s.sideResults[agentKey] ?? null);
+  const setSideResult = useChatStore((s) => s.setSideResult);
   const activeVoiceAgent = useVoiceStore((s) => s.activeAgent);
   const agent = useAgentStore((s) => s.agents[agentKey]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -156,11 +159,20 @@ export function ChatPanel({ agentKey }: Props) {
         )}
       </div>
 
+      {/* BTW side result overlay */}
+      {sideResult && (
+        <BtwOverlay
+          content={sideResult}
+          onDismiss={() => setSideResult(agentKey, null)}
+        />
+      )}
+
       {/* Input */}
       <ChatInput
         value={draft}
         onChange={setDraft}
         onSend={sendMessage}
+        onBtw={sendBtw}
         onInterrupt={interrupt}
         isStreaming={isStreaming}
         placeholder={`Message ${agent?.name || 'agent'}...`}

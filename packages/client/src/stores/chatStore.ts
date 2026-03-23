@@ -16,6 +16,8 @@ interface ChatState {
   drafts: Record<string, string>;
   streaming: Record<string, boolean>;
   streamBuffer: Record<string, string>;
+  // Ephemeral BTW side results — not persisted, cleared on dismiss or timeout
+  sideResults: Record<string, string | null>;
   // Pagination state per agent
   hasOlderMessages: Record<string, boolean>;
   loadingOlder: Record<string, boolean>;
@@ -30,6 +32,7 @@ interface ChatState {
   clearMessages: (agent: string) => void;
   setHasOlderMessages: (agent: string, has: boolean) => void;
   setLoadingOlder: (agent: string, loading: boolean) => void;
+  setSideResult: (agent: string, content: string | null) => void;
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -37,6 +40,7 @@ export const useChatStore = create<ChatState>((set) => ({
   drafts: {},
   streaming: {},
   streamBuffer: {},
+  sideResults: {},
   hasOlderMessages: {},
   loadingOlder: {},
 
@@ -134,6 +138,9 @@ export const useChatStore = create<ChatState>((set) => ({
 
   setLoadingOlder: (agent, loading) =>
     set((s) => ({ loadingOlder: { ...s.loadingOlder, [agent]: loading } })),
+
+  setSideResult: (agent, content) =>
+    set((s) => ({ sideResults: { ...s.sideResults, [agent]: content } })),
 }));
 
 // Expose for Playwright tests

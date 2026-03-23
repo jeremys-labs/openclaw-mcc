@@ -279,6 +279,230 @@ function JsonRenderer({ data, onSelect }: { data: unknown; onSelect?: (id: strin
 }
 
 // ---------------------------------------------------------------------------
+// Meeting Action Items renderer
+// ---------------------------------------------------------------------------
+
+interface ActionItem {
+  id: string;
+  text: string;
+  assignee: string | null;
+  deadline: string | null;
+  source: string;
+  addedAt: string;
+  completed: boolean;
+  completedAt: string | null;
+}
+
+interface MeetingActionData {
+  version?: number;
+  lastUpdated?: string;
+  items: ActionItem[];
+}
+
+function folderColor(source: string): string {
+  const s = (source || '').toLowerCase();
+  if (s.startsWith('cellebrite/guardian')) return '#3b82f6';
+  if (s.startsWith('cellebrite')) return '#60a5fa';
+  if (s.startsWith('real estate')) return '#f59e0b';
+  if (s.startsWith('my to-dos') || s.startsWith('personal')) return '#4ade80';
+  return '#a78bfa';
+}
+
+function folderLabel(source: string): string {
+  if (!source) return 'Unknown';
+  const parts = source.split('/');
+  return parts.length >= 2 ? parts.slice(0, 2).join(' / ') : parts[0];
+}
+
+function ageLabel(addedAt: string): string {
+  if (!addedAt) return '';
+  const diffMs = Date.now() - new Date(addedAt).getTime();
+  const days = Math.floor(diffMs / 86_400_000);
+  if (days === 0) return 'added today';
+  if (days === 1) return '1 day old';
+  if (days < 7) return `${days} days old`;
+  if (days < 14) return '1 week old';
+  if (days < 30) return `${Math.floor(days / 7)} weeks old`;
+  if (days < 60) return '1 month old';
+  return `${Math.floor(days / 30)} months old`;
+}
+
+function DeadlineBadge({ deadline }: { deadline: string }) {
+  const colors: Record<string, { bg: string; text: string }> = {
+    today: { bg: '#ef4444', text: '#fff' },
+    tomorrow: { bg: '#f59e0b', text: '#000' },
+    sunday: { bg: '#8b5cf6', text: '#fff' },
+    q1: { bg: '#0ea5e9', text: '#fff' },
+    q2: { bg: '#0ea5e9', text: '#fff' },
+    q3: { bg: '#0ea5e9', text: '#fff' },
+    q4: { bg: '#0ea5e9', text: '#fff' },
+  };
+  const c = colors[deadline.toLowerCase()] || { bg: '#475569', text: '#fff' };
+  return (
+    <span style={{ background: c.bg, color: c.text }} className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide">
+      {deadline}
+    </span>
+  );
+}
+
+function AssigneeBadge({ assignee }: { assignee: string }) {
+  return (
+    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-900/40 text-blue-300">
+      👤 {assignee}
+    </span>
+  );
+}
+
+function MeetingActionItems({ data: initialData, agentKey, tabId }: { data: MeetingActionData; agentKey: string; tabId: string }) {
+  const [items, setItems] = useState<ActionItem[]>(initialData?.items ?? []);
+  const [showCompleted, setShowCompleted] = useState(false);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+
+  const callApi = async (itemId: string, action: 'complete' | 'uncomplete' | 'delete') => {
+    setPendingIds(prev => new Set(prev).add(itemId));
+    try {
+      await fetch(`/api/agent-data/${agentKey}/${tabId}/${itemId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      setItems(prev => {
+        if (action === 'delete') return prev.filter(i => i.id !== itemId);
+        return prev.map(i => i.id !== itemId ? i : {
+          ...i,
+          completed: action === 'complete',
+          completedAt: action === 'complete' ? new Date().toISOString() : null,
+        });
+      });
+    } finally {
+      setPendingIds(prev => { const s = new Set(prev); s.delete(itemId); return s; });
+    }
+  };
+
+  const openItems = items.filter(i => !i.completed);
+  const completedItems = items.filter(i => i.completed);
+  const visibleItems = showCompleted ? items : openItems;
+
+  if (!items.length) {
+    return (
+      <div className="text-center text-text-secondary py-10">
+        <div className="text-3xl mb-2">✅</div>
+        <p>All done — no action items.</p>
+      </div>
+    );
+  }
+
+  // Group visible items by folder
+  const sorted = [...visibleItems].sort((a, b) => {
+    if (a.completed !== b.completed) return a.completed ? 1 : -1;
+    return new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime();
+  });
+
+  const groups: Record<string, ActionItem[]> = {};
+  for (const item of sorted) {
+    const label = folderLabel(item.source);
+    if (!groups[label]) groups[label] = [];
+    groups[label].push(item);
+  }
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-3">
+        <span className="text-xs text-text-secondary">
+          📋 <span className="text-text-primary font-semibold">{openItems.length} open</span>
+          {completedItems.length > 0 && (
+            <>
+              {' · '}
+              <button
+                onClick={() => setShowCompleted(v => !v)}
+                className="text-text-secondary hover:text-accent underline underline-offset-2 transition-colors"
+              >
+                {showCompleted ? 'hide' : `${completedItems.length} completed`}
+              </button>
+            </>
+          )}
+        </span>
+        {initialData.lastUpdated && (
+          <span className="text-[10px] text-text-secondary/50">
+            {new Date(initialData.lastUpdated).toLocaleString()}
+          </span>
+        )}
+      </div>
+
+      {openItems.length === 0 && !showCompleted && (
+        <div className="text-center text-text-secondary py-6 text-xs">
+          All items complete.{' '}
+          <button onClick={() => setShowCompleted(true)} className="text-accent underline">Show {completedItems.length} completed</button>
+        </div>
+      )}
+
+      {/* Groups */}
+      <div className="space-y-3">
+        {Object.entries(groups).map(([label, groupItems]) => {
+          const color = folderColor(groupItems[0].source);
+          return (
+            <div
+              key={label}
+              style={{ borderLeftColor: color }}
+              className="border border-white/10 border-l-4 rounded-lg p-3"
+            >
+              <div style={{ color }} className="text-[10px] font-bold uppercase tracking-wider mb-2">
+                {label}
+              </div>
+              <div className="space-y-2">
+                {groupItems.map(item => {
+                  const pending = pendingIds.has(item.id);
+                  return (
+                    <div
+                      key={item.id}
+                      className={`flex items-start gap-2 ${item.completed ? 'opacity-40' : ''} ${pending ? 'pointer-events-none' : ''}`}
+                    >
+                      {/* Checkbox */}
+                      <button
+                        onClick={() => callApi(item.id, item.completed ? 'uncomplete' : 'complete')}
+                        style={{ borderColor: item.completed ? '#4ade80' : '#475569', background: item.completed ? '#4ade80' : 'transparent' }}
+                        className="w-3.5 h-3.5 min-w-[14px] rounded border-2 mt-0.5 flex items-center justify-center hover:border-green-400 transition-colors shrink-0"
+                        title={item.completed ? 'Mark incomplete' : 'Mark complete'}
+                      >
+                        {item.completed && <span className="text-black text-[8px] font-black leading-none">✓</span>}
+                      </button>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-xs leading-snug ${item.completed ? 'line-through text-text-secondary' : 'text-text-primary'}`}>
+                          {item.text}
+                        </p>
+                        <div className="flex gap-1.5 flex-wrap items-center mt-1">
+                          {item.deadline && <DeadlineBadge deadline={item.deadline} />}
+                          {item.assignee && <AssigneeBadge assignee={item.assignee} />}
+                          <span className={`text-[10px] ${item.completed ? 'text-text-secondary/40' : 'text-text-secondary/60'}`}>
+                            {ageLabel(item.addedAt)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Delete button — always visible for touch compatibility */}
+                      <button
+                        onClick={() => callApi(item.id, 'delete')}
+                        className="text-text-secondary/30 hover:text-red-400 active:text-red-500 transition-colors text-sm px-1 shrink-0 mt-0.5 touch-manipulation"
+                        title="Delete item"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -374,6 +598,8 @@ export function AgentInfoTabs({ agentKey }: Props) {
             <div className="prose prose-invert prose-sm max-w-none">
               <ReactMarkdown remarkPlugins={[remarkGfm, remarkFrontmatter]}>{tabData}</ReactMarkdown>
             </div>
+          ) : currentTab?.source === 'file:meeting-action-items.json' && tabData && typeof tabData === 'object' && 'items' in (tabData as object) ? (
+            <MeetingActionItems data={tabData as MeetingActionData} agentKey={agentKey} tabId={activeTab!} />
           ) : (
             <JsonRenderer data={tabData} onSelect={isCronTab ? setSelectedCronId : undefined} />
           )}
