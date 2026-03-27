@@ -71,8 +71,10 @@ export class ChatStreamService extends EventEmitter {
     this.broadcast(agent, 'message.aborted', { messageId, reason });
   }
 
-  broadcastSideResult(agent: string, content: string): void {
-    this.broadcast(agent, 'message.side_result', { content });
+  broadcastSideResult(agent: string, content: string, question?: string): void {
+    const data: Record<string, unknown> = { content };
+    if (question) data.question = question;
+    this.broadcast(agent, 'message.side_result', data);
   }
 
   broadcastContextUpdate(agent: string, tokens: number, maxTokens: number): void {

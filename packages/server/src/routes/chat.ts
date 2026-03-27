@@ -149,7 +149,13 @@ export function createChatRouter({ config, db, gateway, streaming }: ChatDeps): 
 
     try {
       if (gateway.isConnected) {
-        await gateway.request('chat.btw', { sessionKey, question: question.trim() });
+        // BTW is a slash command sent via chat.send — the Gateway parses /btw <question>
+        // and routes it as an ephemeral side question, responding via chat.side_result event.
+        await gateway.request('chat.send', {
+          sessionKey,
+          message: `/btw ${question.trim()}`,
+          idempotencyKey: `btw-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        });
         res.json({ ok: true });
       } else {
         res.status(503).json({ error: 'Gateway not connected' });

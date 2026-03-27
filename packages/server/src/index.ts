@@ -85,11 +85,19 @@ gateway.on('event', (frame: Record<string, unknown>) => {
     const agent = sessionToAgent[sessionKey];
     if (!agent) return;
 
-    const message = payload.message as Record<string, unknown> | undefined;
-    if (message) {
-      const text = extractMessageText(message);
-      if (text) {
-        streaming.broadcastSideResult(agent, text);
+    // Gateway side_result payload shape: { kind, sessionKey, text, question, runId, ts, isError }
+    // text is directly on payload; fall back to payload.message for legacy compat
+    const directText = typeof payload.text === 'string' ? payload.text : null;
+    if (directText && directText.trim()) {
+      const question = typeof payload.question === 'string' ? payload.question : undefined;
+      streaming.broadcastSideResult(agent, directText.trim(), question);
+    } else {
+      const message = payload.message as Record<string, unknown> | undefined;
+      if (message) {
+        const text = extractMessageText(message);
+        if (text) {
+          streaming.broadcastSideResult(agent, text);
+        }
       }
     }
   }
