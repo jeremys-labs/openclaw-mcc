@@ -1,7 +1,8 @@
-import { memo, useState, useCallback } from 'react';
+import { memo, useState, useCallback, useEffect } from 'react';
 import { Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { formatRelativeTime, formatPreciseTime } from '../utils/formatTime';
 
 /**
  * LLMs occasionally produce malformed GFM tables. Two known failure modes:
@@ -94,14 +95,22 @@ interface Props {
   role: 'user' | 'assistant';
   content: string;
   agentName?: string;
+  timestamp?: number;
   streaming?: boolean;
   error?: string;
   onRetry?: () => void;
 }
 
-export const ChatMessage = memo(function ChatMessage({ role, content, agentName, streaming, error, onRetry }: Props) {
+export const ChatMessage = memo(function ChatMessage({ role, content, agentName, timestamp, streaming, error, onRetry }: Props) {
   const isUser = role === 'user';
   const [copied, setCopied] = useState(false);
+  // Tick every 60s so relative labels stay fresh ("just now" → "1 min ago" etc.)
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!timestamp || streaming) return;
+    const id = setInterval(() => setTick((t) => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, [timestamp, streaming]);
 
   const handleCopy = useCallback(() => {
     const text = stripMarkdown(content);
@@ -172,6 +181,16 @@ export const ChatMessage = memo(function ChatMessage({ role, content, agentName,
         </div>
         {streaming && (
           <span className="inline-block w-2 h-4 bg-accent animate-pulse ml-1" />
+        )}
+        {timestamp && !streaming && (
+          <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mt-1`}>
+            <span
+              className="text-[10px] text-text-secondary/50 hover:text-text-secondary/80 transition-colors cursor-default select-none"
+              title={formatPreciseTime(timestamp)}
+            >
+              {formatRelativeTime(timestamp)}
+            </span>
+          </div>
         )}
       </div>
     </div>

@@ -145,6 +145,7 @@ export function ChatPanel({ agentKey }: Props) {
               role={msg.role}
               content={msg.content}
               agentName={msg.role === 'assistant' ? agent?.name : undefined}
+              timestamp={msg.timestamp}
               error={msg.error}
               onRetry={
                 msg.error && prevUserMsg
