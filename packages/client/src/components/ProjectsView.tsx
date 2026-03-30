@@ -2,6 +2,24 @@ import { useEffect } from 'react';
 import { useProjectStore, type Project } from '../stores/projectStore';
 import { useUIStore } from '../stores/uiStore';
 
+/**
+ * Format a lastUpdated ISO string as a compact age label, e.g. "2h ago", "3d ago".
+ */
+function formatAge(iso: string): string {
+  if (!iso) return '';
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const diffMin = Math.floor(diffMs / 60_000);
+  if (diffMin < 2) return 'just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDays = Math.floor(diffHr / 24);
+  if (diffDays < 30) return `${diffDays}d ago`;
+  const diffWeeks = Math.floor(diffDays / 7);
+  if (diffDays < 60) return `${diffWeeks}w ago`;
+  return `${Math.floor(diffDays / 30)}mo ago`;
+}
+
 const COLUMNS: { id: string; label: string; statuses: Project['status'][] }[] = [
   { id: 'active', label: 'Active Development', statuses: ['active'] },
   { id: 'ready', label: 'Ready to Build', statuses: ['ready'] },
@@ -27,12 +45,27 @@ function ProjectCard({ project }: { project: Project }) {
 
       <p className="text-xs text-text-secondary leading-snug mb-2">{project.summary}</p>
 
+      {project.nextStep && (
+        <div className="flex items-start gap-1.5 mb-2">
+          <span className="shrink-0 bg-blue-500/20 text-blue-400 text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wide">
+            Next
+          </span>
+          <span className="text-xs text-blue-300/90 leading-snug">{project.nextStep}</span>
+        </div>
+      )}
+
       {project.blocker && (
-        <div className="flex items-start gap-1.5">
+        <div className="flex items-start gap-1.5 mb-2">
           <span className="shrink-0 bg-red-500/20 text-red-400 text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wide">
             Blocker
           </span>
           <span className="text-xs text-red-400/90 leading-snug">{project.blocker}</span>
+        </div>
+      )}
+
+      {project.lastUpdated && (
+        <div className="text-[10px] text-text-secondary/40 mt-1 text-right">
+          updated {formatAge(project.lastUpdated)}
         </div>
       )}
     </button>
