@@ -176,7 +176,7 @@ export const ChatMessage = memo(function ChatMessage({ role, content, agentName,
         {!isUser && agentName && (
           <div className="text-xs text-text-secondary mb-1 font-medium">{agentName}</div>
         )}
-        <div className={`prose prose-invert prose-sm max-w-none break-words [overflow-wrap:anywhere] [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:break-all${!isUser ? ' pr-6' : ''}`}>
+        <div className={`prose prose-invert prose-sm max-w-none break-words [overflow-wrap:anywhere] [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:break-all${!isUser ? ' pr-6' : ' [&_ol]:text-white [&_ol>li]:marker:text-white [&_ul>li]:marker:text-white'}` }>
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizeMarkdownTables(content)}</ReactMarkdown>
         </div>
         {streaming && (
@@ -185,7 +185,11 @@ export const ChatMessage = memo(function ChatMessage({ role, content, agentName,
         {timestamp && !streaming && (
           <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mt-1`}>
             <span
-              className="text-[10px] text-text-secondary/50 hover:text-text-secondary/80 transition-colors cursor-default select-none"
+              className={`text-[10px] transition-colors cursor-default select-none ${
+                isUser
+                  ? 'text-white/60 hover:text-white/90'
+                  : 'text-text-secondary/50 hover:text-text-secondary/80'
+              }`}
               title={formatPreciseTime(timestamp)}
             >
               {formatRelativeTime(timestamp)}
