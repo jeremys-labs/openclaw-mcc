@@ -71,6 +71,7 @@ export function createVoiceRouter(config: AppConfig): Router {
       'audio/webm',
       'audio/ogg',
       'audio/mp4',
+      'audio/aac',
       'audio/wav',
       'audio/mpeg',
       'audio/x-wav',

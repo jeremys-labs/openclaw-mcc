@@ -19,6 +19,7 @@ export function useVoice() {
   const streamRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const recorderMimeTypeRef = useRef<string>('audio/webm');
 
   const cleanupAudio = useCallback(() => {
     if (audioRef.current) {
@@ -53,15 +54,30 @@ export function useVoice() {
       streamRef.current = stream;
       chunksRef.current = [];
 
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/webm')
-          ? 'audio/webm'
-          : '';
+      if (typeof MediaRecorder === 'undefined') {
+        throw new Error('Voice recording is not supported in this browser');
+      }
 
-      const recorder = mimeType
-        ? new MediaRecorder(stream, { mimeType })
-        : new MediaRecorder(stream);
+      const candidateMimeTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/mp4;codecs=mp4a.40.2',
+        'audio/aac',
+        'audio/ogg',
+      ];
+      const recorderMimeType = typeof MediaRecorder.isTypeSupported === 'function'
+        ? (candidateMimeTypes.find((type) => MediaRecorder.isTypeSupported(type)) || '')
+        : '';
+
+      const recorderOptions = recorderMimeType ? { mimeType: recorderMimeType } : {};
+      let recorder: MediaRecorder;
+      try {
+        recorder = new MediaRecorder(stream, recorderOptions);
+      } catch {
+        recorder = new MediaRecorder(stream);
+      }
+      recorderMimeTypeRef.current = recorder.mimeType || recorderMimeType || 'audio/webm';
 
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
@@ -74,7 +90,6 @@ export function useVoice() {
       setError(err instanceof Error ? err.message : 'Microphone access denied');
     }
   }, [setRecording, setError]);
-
   const stopRecording = useCallback(async (): Promise<string | null> => {
     const recorder = mediaRecorderRef.current;
     if (!recorder || recorder.state === 'inactive') {
@@ -89,8 +104,9 @@ export function useVoice() {
         streamRef.current = null;
         setRecording(false);
 
+        const actualMimeType = recorder.mimeType || recorderMimeTypeRef.current || 'audio/webm';
         const blob = new Blob(chunksRef.current, {
-          type: recorder.mimeType || 'audio/webm',
+          type: actualMimeType,
         });
         chunksRef.current = [];
 
@@ -101,8 +117,17 @@ export function useVoice() {
 
         setTranscribing(true);
         try {
+          const extension = actualMimeType.includes('mp4') || actualMimeType.includes('m4a')
+            ? 'mp4'
+            : actualMimeType.includes('wav')
+              ? 'wav'
+              : actualMimeType.includes('aac')
+                ? 'aac'
+                : actualMimeType.includes('ogg')
+                  ? 'ogg'
+                  : 'webm';
           const form = new FormData();
-          form.append('audio', blob, 'recording.webm');
+          form.append('audio', blob, `recording.${extension}`);
           const res = await fetch('/api/voice/transcribe', {
             method: 'POST',
             body: form,
