@@ -50,6 +50,13 @@ export function useVoice() {
   const startRecording = useCallback(async () => {
     setError(null);
     try {
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+        const secureHint = window.isSecureContext
+          ? 'Microphone APIs are unavailable in this browser.'
+          : 'Microphone access requires HTTPS or localhost on this device/browser.';
+        throw new Error(secureHint);
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       chunksRef.current = [];

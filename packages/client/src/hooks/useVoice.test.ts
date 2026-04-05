@@ -5,7 +5,9 @@ import path from 'node:path';
 describe('useVoice mobile compatibility', () => {
   const file = fs.readFileSync(path.join(__dirname, 'useVoice.ts'), 'utf8');
 
-  test('guards MediaRecorder feature detection before calling isTypeSupported', () => {
+  test('guards browser microphone APIs before recording', () => {
+    expect(file).toContain("!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function'");
+    expect(file).toContain("Microphone access requires HTTPS or localhost on this device/browser.");
     expect(file).toContain("typeof MediaRecorder === 'undefined'");
     expect(file).toContain("typeof MediaRecorder.isTypeSupported === 'function'");
   });
