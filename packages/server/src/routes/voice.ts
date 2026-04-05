@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import multer from 'multer';
+import path from 'node:path';
 import type { AppConfig } from '../types/config.js';
 import {
   synthesizeSpeech,
@@ -11,6 +12,33 @@ import {
 } from '../services/voice.js';
 
 const DEFAULT_VOICE = 'en-US-JennyNeural';
+
+function normalizeUploadedAudioType(mimeType?: string, originalName?: string): string {
+  const normalizedMime = (mimeType || '').toLowerCase();
+  if (normalizedMime && normalizedMime !== 'application/octet-stream') {
+    return normalizedMime;
+  }
+
+  const ext = path.extname(originalName || '').toLowerCase();
+  switch (ext) {
+    case '.webm':
+      return 'audio/webm';
+    case '.ogg':
+    case '.opus':
+      return 'audio/ogg';
+    case '.mp4':
+    case '.m4a':
+      return 'audio/mp4';
+    case '.aac':
+      return 'audio/aac';
+    case '.mp3':
+      return 'audio/mpeg';
+    case '.wav':
+      return 'audio/wav';
+    default:
+      return normalizedMime || 'application/octet-stream';
+  }
+}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -66,19 +94,21 @@ export function createVoiceRouter(config: AppConfig): Router {
       return;
     }
 
-    const mimeType = file.mimetype || 'audio/webm';
-    const allowedTypes = [
+    const mimeType = normalizeUploadedAudioType(file.mimetype, file.originalname);
+    const allowedTypes = new Set([
       'audio/webm',
       'audio/ogg',
+      'audio/opus',
       'audio/mp4',
+      'audio/x-m4a',
       'audio/aac',
       'audio/wav',
-      'audio/mpeg',
       'audio/x-wav',
       'audio/wave',
-    ];
+      'audio/mpeg',
+    ]);
 
-    if (!allowedTypes.some((t) => mimeType.startsWith(t.split('/')[0]))) {
+    if (!allowedTypes.has(mimeType)) {
       res.status(400).json({ error: `Unsupported audio type: ${mimeType}` });
       return;
     }
