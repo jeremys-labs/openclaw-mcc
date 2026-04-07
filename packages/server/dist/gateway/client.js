@@ -4,16 +4,7 @@ const PING_INTERVAL_MS = 25_000;
 const REQUEST_TIMEOUT_MS = 30_000;
 const RECONNECT_BASE_MS = 3_000;
 const RECONNECT_MAX_MS = 30_000;
-const MAX_RECONNECT_ATTEMPTS = 5;
-
 export class GatewayClient extends EventEmitter {
-    // Track connection metrics
-    metrics = {
-        latency: 0,
-        packetLoss: 0,
-        lastPongTime: 0,
-        reconnectAttempts: 0
-    };
     url;
     token;
     ws = null;
@@ -143,27 +134,17 @@ export class GatewayClient extends EventEmitter {
             return;
         }
     }
-    // Enhanced state management
     setState(newState) {
         if (this.state !== newState) {
             this.state = newState;
-            this.emit('state', {
-                state: newState,
-                metrics: this.metrics
-            });
+            this.emit('state', newState);
         }
     }
-    // Enhanced ping/pong tracking
     startPing() {
         this.stopPing();
         this.pingTimer = setInterval(() => {
-            if (this.ws?.readyState === WebSocket.OPEN) {
-                const pingTime = Date.now();
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
                 this.ws.ping();
-                this.ws.once('pong', () => {
-                    this.metrics.latency = Date.now() - pingTime;
-                    this.metrics.lastPongTime = Date.now();
-                });
             }
         }, PING_INTERVAL_MS);
     }
@@ -186,20 +167,12 @@ export class GatewayClient extends EventEmitter {
             this.pendingRequests.delete(id);
         }
     }
-    // Improved reconnect logic
     scheduleReconnect() {
-        if (!this.shouldReconnect || this.metrics.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            this.setState('disconnected');
+        if (!this.shouldReconnect)
             return;
-        }
-
         this.setState('reconnecting');
-        const delay = Math.min(
-            RECONNECT_BASE_MS * Math.pow(2, this.metrics.reconnectAttempts),
-            RECONNECT_MAX_MS
-        );
-        
-        this.metrics.reconnectAttempts++;
+        const delay = Math.min(RECONNECT_BASE_MS * Math.pow(2, this.reconnectAttempts), RECONNECT_MAX_MS);
+        this.reconnectAttempts++;
         this.reconnectTimer = setTimeout(() => {
             this.connect();
         }, delay);

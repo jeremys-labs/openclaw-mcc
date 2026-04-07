@@ -25,17 +25,21 @@ export default function App() {
   const loading = useAgentStore((s) => s.loading);
   const error = useAgentStore((s) => s.error);
   const setGatewayStatus = useConnectionStore((s) => s.setGatewayStatus);
+  const setMetrics = useConnectionStore((s) => s.setMetrics);
 
   // Health check poller
   useEffect(() => {
     let mounted = true;
 
     async function checkHealth() {
+      const start = Date.now();
       try {
         const res = await fetch('/api/health');
+        const latency = Date.now() - start;
         if (!res.ok) throw new Error('Health check failed');
         const data = await res.json();
         if (!mounted) return;
+        setMetrics({ latency });
         if (data.gateway === 'connected' || data.gateway === true) {
           setGatewayStatus('connected');
         } else if (data.gateway === 'reconnecting') {
@@ -44,7 +48,10 @@ export default function App() {
           setGatewayStatus('disconnected');
         }
       } catch {
-        if (mounted) setGatewayStatus('disconnected');
+        if (mounted) {
+          setGatewayStatus('disconnected');
+          setMetrics({ latency: 0 });
+        }
       }
     }
 

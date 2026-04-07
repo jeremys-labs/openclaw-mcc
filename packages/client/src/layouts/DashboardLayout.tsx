@@ -1,5 +1,5 @@
 import { useUIStore } from '../stores/uiStore';
-import { useConnectionStore } from '../stores/connectionStore';
+import { ConnectionStatus } from '../components/ConnectionStatus';
 
 const NAV_ICONS: Record<string, string> = {
   office: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4',
@@ -7,36 +7,16 @@ const NAV_ICONS: Record<string, string> = {
   projects: 'M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2',
 };
 
-function ConnectionBanner() {
-  const gatewayStatus = useConnectionStore((s) => s.gatewayStatus);
-
-  if (gatewayStatus === 'connected') return null;
-
-  if (gatewayStatus === 'disconnected') {
-    return (
-      <div className="bg-red-700 text-white text-xs text-center py-1.5 px-4 shrink-0">
-        Gateway disconnected — messages may not be delivered
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-yellow-600 text-white text-xs text-center py-1.5 px-4 shrink-0">
-      Reconnecting to gateway...
-    </div>
-  );
-}
-
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { activeView, setView } = useUIStore();
 
   return (
     <div className="h-screen w-screen bg-surface text-text-primary flex flex-col overflow-hidden">
-      <ConnectionBanner />
       {/* Desktop top nav */}
       <header className="h-12 bg-surface-raised border-b border-white/10 hidden md:flex items-center px-4 shrink-0">
         <h1 className="text-sm font-semibold">OpenClaw Office</h1>
         <nav className="ml-auto flex gap-2">
+          <ConnectionStatus />
           {(['office', 'files', 'projects'] as const).map((view) => (
             <button
               key={view}
@@ -51,9 +31,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </nav>
       </header>
 
-      {/* Mobile top bar - minimal branding only */}
+      {/* Mobile top bar - minimal branding + connection status */}
       <header className="h-10 bg-surface-raised border-b border-white/10 flex md:hidden items-center px-4 shrink-0">
         <h1 className="text-sm font-semibold">OpenClaw Office</h1>
+        <div className="ml-auto">
+          <ConnectionStatus />
+        </div>
       </header>
 
       {/* Main content - add bottom padding on mobile for bottom nav */}
