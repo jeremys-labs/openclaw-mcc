@@ -5,6 +5,9 @@ interface SearchMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+  snippet?: string;
+  matchIndex?: number;
+  matchCount?: number;
 }
 
 /**
@@ -14,7 +17,14 @@ interface SearchMessage {
 export function searchMessages(messages: SearchMessage[], query: string): SearchMessage[] {
   if (!query.trim()) return messages;
   const queryLower = query.toLowerCase();
-  return messages.filter((msg) => msg.content.toLowerCase().includes(queryLower));
+  return messages
+    .filter((msg) => msg.content.toLowerCase().includes(queryLower))
+    .map((msg) => ({
+      ...msg,
+      snippet: msg.content,
+      matchIndex: msg.content.toLowerCase().indexOf(queryLower),
+      matchCount: msg.content.toLowerCase().split(queryLower).length - 1,
+    }));
 }
 
 interface UseSearchState {

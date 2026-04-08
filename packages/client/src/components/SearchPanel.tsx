@@ -6,9 +6,10 @@ import { ChatMessage } from './ChatMessage';
 interface Props {
   agentKey: string;
   onClose: () => void;
+  onJumpToMessage: (seq: number) => void;
 }
 
-export function SearchPanel({ agentKey, onClose }: Props) {
+export function SearchPanel({ agentKey, onClose, onJumpToMessage }: Props) {
   const { query, isSearching, results, totalResults, error, search, clearSearch } = useSearch(agentKey);
   const [inputValue, setInputValue] = useState('');
 
@@ -84,12 +85,27 @@ export function SearchPanel({ agentKey, onClose }: Props) {
         )}
 
         {results.map((msg) => (
-          <ChatMessage
-            key={msg.seq}
-            role={msg.role}
-            content={msg.content}
-            timestamp={msg.timestamp}
-          />
+          <div key={msg.seq} className="mb-3 rounded-xl border border-white/10 bg-surface-overlay/60 p-3">
+            <ChatMessage
+              seq={msg.seq}
+              role={msg.role}
+              content={msg.snippet || msg.content}
+              timestamp={msg.timestamp}
+              highlightedText={query}
+              emphasis
+            />
+            <div className="mt-2 flex items-center justify-between gap-3 px-1">
+              <span className="text-[11px] text-text-secondary">
+                {msg.matchCount || 1} match{msg.matchCount === 1 ? '' : 'es'} in message
+              </span>
+              <button
+                onClick={() => onJumpToMessage(msg.seq)}
+                className="px-2.5 py-1.5 text-xs rounded-lg border border-white/10 bg-surface-raised text-text-primary hover:bg-surface-overlay transition-colors"
+              >
+                Jump to message
+              </button>
+            </div>
+          </div>
         ))}
 
         {isSearching && (

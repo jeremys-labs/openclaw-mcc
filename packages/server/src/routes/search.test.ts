@@ -36,7 +36,7 @@ afterEach(() => {
 });
 
 describe('Search Router', () => {
-  it('should search messages by query', async () => {
+  it('should search messages by query and return contextual snippets', async () => {
     const res = await new Promise<any>((resolve) => {
       const mockRes = {
         json: (data: any) => resolve({ status: 200, data }),
@@ -55,6 +55,9 @@ describe('Search Router', () => {
     expect(res.status).toBe(200);
     expect(res.data.results).toHaveLength(4);
     expect(res.data.results.every((m: any) => m.content.toLowerCase().includes('learning'))).toBe(true);
+    expect(res.data.results[0].snippet.toLowerCase()).toContain('learning');
+    expect(res.data.results[0].matchIndex).toBeTypeOf('number');
+    expect(res.data.results[0].matchCount).toBeGreaterThan(0);
   });
 
   it('should filter results by agent', async () => {
@@ -98,14 +101,22 @@ describe('Search Router', () => {
     expect(res.data.results).toEqual([]);
   });
 
-  it('should be case-insensitive', async () => {
+  it('should be case-insensitive and rank earlier matches first', async () => {
+    db.addMessage(
+      'alice',
+      'assistant',
+      'Learning matters when teams revisit learning loops and learning reviews.',
+      Date.now() - 1500,
+      'a4'
+    );
+
     const res = await new Promise<any>((resolve) => {
       const mockRes = {
         json: (data: any) => resolve({ status: 200, data }),
         status: (code: number) => ({ json: (data: any) => resolve({ status: code, data }) }),
       };
       const mockReq = {
-        query: { agent: 'alice', q: 'NEURAL' },
+        query: { agent: 'alice', q: 'LEARNING' },
       };
       const router = createSearchRouter(db);
       const handler = router.stack.find((r) => r.route?.path === '/')?.route?.stack[0].handle;
@@ -115,8 +126,10 @@ describe('Search Router', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(res.data.results).toHaveLength(1);
-    expect(res.data.results[0].content).toContain('neural');
+    expect(res.data.results).toHaveLength(5);
+    expect(res.data.results[0].content).toContain('Learning matters');
+    expect(res.data.results[0].matchCount).toBe(3);
+    expect(res.data.results[0].snippet).toContain('Learning matters');
   });
 
   it('should require agent parameter', async () => {

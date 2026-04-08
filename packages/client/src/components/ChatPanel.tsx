@@ -12,6 +12,7 @@ import { useVoiceStore } from '../stores/voiceStore';
 import { useAgentStore } from '../stores/agentStore';
 import { ChevronUp, Loader2, Search } from 'lucide-react';
 
+const SEARCH_HIGHLIGHT_DURATION_MS = 2200;
 const EMPTY_MESSAGES: { seq: number; role: 'user' | 'assistant'; content: string; timestamp: number }[] = [];
 
 interface Props {
@@ -33,6 +34,7 @@ export function ChatPanel({ agentKey }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevMsgCountRef = useRef(0);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [focusedMessageSeq, setFocusedMessageSeq] = useState<number | null>(null);
   // Track scroll position before prepending older messages so we can restore it
   const scrollAnchorRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
 
@@ -95,6 +97,40 @@ export function ChatPanel({ agentKey }: Props) {
     loadOlderMessages();
   }, [loadOlderMessages]);
 
+  const handleJumpToMessage = useCallback((seq: number) => {
+    setSearchOpen(false);
+    setFocusedMessageSeq(seq);
+  }, []);
+
+  useEffect(() => {
+    if (!focusedMessageSeq || searchOpen) return;
+
+    const hasTargetMessage = messages.some((msg) => msg.seq === focusedMessageSeq);
+    if (!hasTargetMessage) {
+      if (hasOlderMessages && !loadingOlder) {
+        handleLoadOlder();
+        return;
+      }
+
+      setFocusedMessageSeq(null);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const target = scrollRef.current?.querySelector(`[data-message-seq="${focusedMessageSeq}"]`) as HTMLElement | null;
+      target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 0);
+
+    const clearTimer = window.setTimeout(() => {
+      setFocusedMessageSeq(null);
+    }, SEARCH_HIGHLIGHT_DURATION_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+      window.clearTimeout(clearTimer);
+    };
+  }, [focusedMessageSeq, searchOpen, messages, hasOlderMessages, loadingOlder, handleLoadOlder]);
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -128,7 +164,7 @@ export function ChatPanel({ agentKey }: Props) {
       {/* Messages / Search */}
       {searchOpen ? (
         <div className="flex-1 min-h-0">
-          <SearchPanel agentKey={agentKey} onClose={() => setSearchOpen(false)} />
+          <SearchPanel agentKey={agentKey} onClose={() => setSearchOpen(false)} onJumpToMessage={handleJumpToMessage} />
         </div>
       ) : (
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-4">
@@ -158,11 +194,13 @@ export function ChatPanel({ agentKey }: Props) {
             return (
               <ChatMessage
                 key={msg.seq || i}
+                seq={msg.seq}
                 role={msg.role}
                 content={msg.content}
                 agentName={msg.role === 'assistant' ? agent?.name : undefined}
                 timestamp={msg.timestamp}
                 error={msg.error}
+                emphasis={focusedMessageSeq === msg.seq}
                 onRetry={
                   msg.error && prevUserMsg
                     ? () => retryMessage(prevUserMsg.content, msg.seq)

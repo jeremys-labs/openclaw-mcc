@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { ChatPanel } from './ChatPanel';
 
 const mockUseChat = vi.fn();
@@ -51,21 +51,36 @@ vi.mock('./VoiceMode', () => ({
 }));
 
 vi.mock('./SearchPanel', () => ({
-  SearchPanel: ({ onClose }: { onClose: () => void }) => (
+  SearchPanel: ({ onClose, onJumpToMessage }: { onClose: () => void; onJumpToMessage: (seq: number) => void }) => (
     <div>
       <div>search-panel</div>
+      <button onClick={() => onJumpToMessage(1)}>Jump to result</button>
       <button onClick={onClose}>Close search</button>
     </div>
   ),
 }));
 
 describe('ChatPanel search', () => {
+  let chatState: any;
+  let loadOlderMessages: ReturnType<typeof vi.fn>;
+
+  afterEach(() => {
+    cleanup();
+  });
+
   beforeEach(() => {
+    vi.useFakeTimers();
+
     Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
       configurable: true,
       value: vi.fn(),
     });
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: vi.fn(),
+    });
 
+    loadOlderMessages = vi.fn();
     mockUseChat.mockReturnValue({
       draft: '',
       setDraft: vi.fn(),
@@ -73,14 +88,14 @@ describe('ChatPanel search', () => {
       sendBtw: vi.fn(),
       retryMessage: vi.fn(),
       loadHistory: vi.fn(),
-      loadOlderMessages: vi.fn(),
+      loadOlderMessages,
       interrupt: vi.fn(),
     });
 
     mockUseVoice.mockReturnValue({ speak: vi.fn() });
     mockUseSSE.mockReturnValue(undefined);
 
-    const chatState = {
+    chatState = {
       messages: {
         marcus: [{ seq: 1, role: 'assistant', content: 'hello world', timestamp: Date.now() }],
       },
@@ -108,6 +123,10 @@ describe('ChatPanel search', () => {
     );
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('opens the search panel from the header and closes back to chat', () => {
     render(<ChatPanel agentKey="marcus" />);
 
@@ -123,5 +142,27 @@ describe('ChatPanel search', () => {
 
     expect(screen.getByText('hello world')).toBeTruthy();
     expect(screen.queryByText('search-panel')).toBeNull();
+  });
+
+  it('returns to the chat when jumping to a search result', () => {
+    render(<ChatPanel agentKey="marcus" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /search messages/i }));
+    fireEvent.click(screen.getByRole('button', { name: /jump to result/i }));
+
+    expect(screen.getByText('hello world')).toBeTruthy();
+    expect(screen.queryByText('search-panel')).toBeNull();
+  });
+
+  it('loads older messages when a jumped search result is not in the loaded page yet', () => {
+    chatState.messages.marcus = [{ seq: 400, role: 'assistant', content: 'newest message', timestamp: Date.now() }];
+    chatState.hasOlderMessages.marcus = true;
+
+    render(<ChatPanel agentKey="marcus" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /search messages/i }));
+    fireEvent.click(screen.getByRole('button', { name: /jump to result/i }));
+
+    expect(loadOlderMessages).toHaveBeenCalledTimes(1);
   });
 });

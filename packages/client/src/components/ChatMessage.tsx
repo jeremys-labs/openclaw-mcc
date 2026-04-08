@@ -99,9 +99,33 @@ interface Props {
   streaming?: boolean;
   error?: string;
   onRetry?: () => void;
+  seq?: number;
+  highlightedText?: string;
+  emphasis?: boolean;
 }
 
-export const ChatMessage = memo(function ChatMessage({ role, content, agentName, timestamp, streaming, error, onRetry }: Props) {
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function renderHighlightedText(content: string, highlightedText?: string) {
+  if (!highlightedText?.trim()) return content;
+
+  const parts = content.split(new RegExp(`(${escapeRegExp(highlightedText)})`, 'ig'));
+  if (parts.length === 1) return content;
+
+  return parts.map((part, index) =>
+    part.toLowerCase() === highlightedText.toLowerCase() ? (
+      <mark key={`${part}-${index}`} className="rounded bg-yellow-400/30 px-0.5 text-inherit">
+        {part}
+      </mark>
+    ) : (
+      part
+    )
+  );
+}
+
+export const ChatMessage = memo(function ChatMessage({ role, content, agentName, timestamp, streaming, error, onRetry, seq, highlightedText, emphasis }: Props) {
   const isUser = role === 'user';
   const [copied, setCopied] = useState(false);
   // Tick every 60s so relative labels stay fresh ("just now" → "1 min ago" etc.)
@@ -152,13 +176,13 @@ export const ChatMessage = memo(function ChatMessage({ role, content, agentName,
   }
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`} data-message-seq={seq}>
       <div
-        className={`relative max-w-[80%] rounded-lg px-4 py-2 overflow-hidden ${
+        className={`relative max-w-[80%] rounded-lg px-4 py-2 overflow-hidden transition-all ${
           isUser
             ? 'bg-accent text-white'
             : 'bg-surface-overlay text-text-primary'
-        }`}
+        } ${emphasis ? 'ring-2 ring-yellow-400/80 shadow-[0_0_0_1px_rgba(250,204,21,0.25)]' : ''}`}
       >
         {!isUser && (
           <button
@@ -177,7 +201,11 @@ export const ChatMessage = memo(function ChatMessage({ role, content, agentName,
           <div className="text-xs text-text-secondary mb-1 font-medium">{agentName}</div>
         )}
         <div className={`prose prose-invert prose-sm max-w-none break-words [overflow-wrap:anywhere] [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:break-all${!isUser ? ' pr-6' : ' [&_ol]:text-white [&_ol>li]:marker:text-white [&_ul>li]:marker:text-white'}` }>
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizeMarkdownTables(content)}</ReactMarkdown>
+          {highlightedText ? (
+            <div>{renderHighlightedText(content, highlightedText)}</div>
+          ) : (
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizeMarkdownTables(content)}</ReactMarkdown>
+          )}
         </div>
         {streaming && (
           <span className="inline-block w-2 h-4 bg-accent animate-pulse ml-1" />
