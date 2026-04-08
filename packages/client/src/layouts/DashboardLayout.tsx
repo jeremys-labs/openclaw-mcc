@@ -13,7 +13,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="h-screen w-screen bg-surface text-text-primary flex flex-col overflow-hidden">
       {/* Desktop top nav */}
-      <header className="h-12 bg-surface-raised border-b border-white/10 hidden md:flex items-center px-4 shrink-0">
+      <header className="h-12 bg-surface-raised border-b border-white/10 hidden md:flex items-center px-4 shrink-0 pt-[env(safe-area-inset-top)]">
         <h1 className="text-sm font-semibold">OpenClaw Office</h1>
         <nav className="ml-auto flex gap-2">
           <ConnectionStatus />
@@ -32,7 +32,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Mobile top bar - minimal branding + connection status */}
-      <header className="h-10 bg-surface-raised border-b border-white/10 flex md:hidden items-center px-4 shrink-0">
+      <header className="h-10 bg-surface-raised border-b border-white/10 flex md:hidden items-center px-4 shrink-0 pt-[env(safe-area-inset-top)]">
         <h1 className="text-sm font-semibold">OpenClaw Office</h1>
         <div className="ml-auto">
           <ConnectionStatus />
