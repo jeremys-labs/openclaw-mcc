@@ -15,4 +15,5 @@ export interface AppConfig {
   branding: BrandingConfig;
   gateway: GatewayConfig;
   agents: Record<string, AgentConfig>;
+  sidecarPort?: number;
 }

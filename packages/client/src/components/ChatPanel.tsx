@@ -4,6 +4,7 @@ import { ChatInput } from './ChatInput';
 import { BtwOverlay } from './BtwOverlay';
 import { VoiceMode } from './VoiceMode';
 import { SearchPanel } from './SearchPanel';
+import { ProviderSwitch } from './ProviderSwitch';
 import { useChat } from '../hooks/useChat';
 import { useVoice } from '../hooks/useVoice';
 import { useSSE } from '../hooks/useSSE';
@@ -20,7 +21,7 @@ interface Props {
 }
 
 export function ChatPanel({ agentKey }: Props) {
-  const { draft, setDraft, sendMessage, sendBtw, retryMessage, loadHistory, loadOlderMessages, interrupt } = useChat(agentKey);
+  const { draft, setDraft, sendMessage, sendBtw, retryMessage, loadHistory, loadOlderMessages, interrupt, updateProvider } = useChat(agentKey);
   const { speak } = useVoice();
   const messages = useChatStore((s) => s.messages[agentKey] ?? EMPTY_MESSAGES);
   const isStreaming = useChatStore((s) => !!s.streaming[agentKey]);
@@ -146,18 +147,31 @@ export function ChatPanel({ agentKey }: Props) {
             <div className="text-sm font-semibold">{agent?.name}</div>
             <div className="text-xs text-text-secondary">{agent?.role}</div>
           </div>
-          <button
-            onClick={() => setSearchOpen((open) => !open)}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-surface-overlay px-2.5 py-1.5 text-xs text-text-secondary transition-colors hover:text-text-primary hover:bg-surface-raised"
-            aria-label="Search messages"
-            title="Search messages"
-          >
-            <Search className="w-3.5 h-3.5" />
-            <span>Search</span>
-          </button>
-          {agent?.model && (
-            <span className="text-xs text-text-secondary">{agent.model}</span>
-          )}
+          <div className="ml-auto flex items-center gap-2">
+            {agent && (
+              <ProviderSwitch
+                agentKey={agentKey}
+                providerType={agent.providerType}
+                harnessConfig={agent.harnessConfig}
+                defaultCwd="/Volumes/Repo-Drive/src/openclaw-mcc"
+                onChange={(providerType, harnessConfig) => {
+                  void updateProvider(providerType, harnessConfig);
+                }}
+              />
+            )}
+            <button
+              onClick={() => setSearchOpen((open) => !open)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-surface-overlay px-2.5 py-1.5 text-xs text-text-secondary transition-colors hover:text-text-primary hover:bg-surface-raised"
+              aria-label="Search messages"
+              title="Search messages"
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span>Search</span>
+            </button>
+            {agent?.model && (agent.providerType ?? 'llm') === 'llm' && (
+              <span className="text-xs text-text-secondary">{agent.model}</span>
+            )}
+          </div>
         </div>
       </div>
 

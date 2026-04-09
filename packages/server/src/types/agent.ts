@@ -32,6 +32,12 @@ export interface AgentAvatar {
   skinColor?: string[];
 }
 
+export interface HarnessConfig {
+  adapter: 'claude-code' | 'codex';
+  cwd: string;
+  modelConfig?: Record<string, unknown>;
+}
+
 export interface AgentConfig {
   name: string;
   fullName?: string;
@@ -47,4 +53,6 @@ export interface AgentConfig {
   position: AgentPosition;
   tabs: AgentTab[];
   avatar?: AgentAvatar;
+  providerType?: 'llm' | 'persistent-harness';
+  harnessConfig?: HarnessConfig;
 }

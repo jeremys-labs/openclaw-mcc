@@ -90,6 +90,7 @@ describe('ChatPanel search', () => {
       loadHistory: vi.fn(),
       loadOlderMessages,
       interrupt: vi.fn(),
+      updateProvider: vi.fn(),
     });
 
     mockUseVoice.mockReturnValue({ speak: vi.fn() });
@@ -164,5 +165,32 @@ describe('ChatPanel search', () => {
     fireEvent.click(screen.getByRole('button', { name: /jump to result/i }));
 
     expect(loadOlderMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows provider switch and saves provider changes for the current agent', () => {
+    const updateProvider = vi.fn().mockResolvedValue(undefined);
+    mockUseChat.mockReturnValue({
+      draft: '',
+      setDraft: vi.fn(),
+      sendMessage: vi.fn(),
+      sendBtw: vi.fn(),
+      retryMessage: vi.fn(),
+      loadHistory: vi.fn(),
+      loadOlderMessages: vi.fn(),
+      interrupt: vi.fn(),
+      updateProvider,
+    });
+
+    render(<ChatPanel agentKey="marcus" />);
+
+    fireEvent.change(screen.getByLabelText(/provider/i), {
+      target: { value: 'claude-code' },
+    });
+
+    expect(updateProvider).toHaveBeenCalledWith('persistent-harness', {
+      adapter: 'claude-code',
+      cwd: '/Volumes/Repo-Drive/src/openclaw-mcc',
+      modelConfig: undefined,
+    });
   });
 });

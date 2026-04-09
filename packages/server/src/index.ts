@@ -9,6 +9,7 @@ import { createChatDB } from './db.js';
 import { GatewayClient } from './gateway/client.js';
 import { ChatStreamService } from './services/chat-streaming.js';
 import { createChatRouter } from './routes/chat.js';
+import { HarnessBridgeService } from './services/harness-bridge.js';
 import { createConfigRouter } from './routes/config.js';
 import { createHealthRouter } from './routes/health.js';
 import { createFileRoutes } from './routes/files.js';
@@ -45,6 +46,9 @@ const gateway = new GatewayClient(config.gateway.url, config.gateway.token);
 
 // Chat streaming service
 const streaming = new ChatStreamService();
+
+// Harness bridge (only active when sidecarPort is configured)
+const harness = config.sidecarPort ? new HarnessBridgeService(config.sidecarPort) : undefined;
 
 // Build reverse lookup: sessionKey -> agentKey
 const sessionToAgent: Record<string, string> = {};
@@ -152,7 +156,7 @@ app.use(express.json({ limit: '10mb' }));
 // Mount routes
 app.use('/api', createHealthRouter(gateway));
 app.use('/api', createConfigRouter(config));
-app.use('/api', createChatRouter({ config, db, gateway, streaming }));
+app.use('/api', createChatRouter({ config, db, gateway, streaming, harness }));
 app.use('/api', createFileRoutes(contentRoot));
 app.use('/api', createStandupRoutes(contentRoot));
 app.use('/api', createChannelRoutes(contentRoot));

@@ -8,6 +8,11 @@ interface AgentState {
   setAgents: (agents: Record<string, AgentConfig>) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
+  updateAgentProvider: (
+    agentKey: string,
+    providerType: 'llm' | 'persistent-harness',
+    harnessConfig?: AgentConfig['harnessConfig']
+  ) => void;
 }
 
 export const useAgentStore = create<AgentState>((set) => ({
@@ -17,4 +22,14 @@ export const useAgentStore = create<AgentState>((set) => ({
   setAgents: (agents) => set({ agents, loading: false }),
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error, loading: false }),
+  updateAgentProvider: (agentKey, providerType, harnessConfig) => set((state) => ({
+    agents: {
+      ...state.agents,
+      [agentKey]: {
+        ...state.agents[agentKey],
+        providerType,
+        harnessConfig: providerType === 'llm' ? undefined : harnessConfig,
+      },
+    },
+  })),
 }));

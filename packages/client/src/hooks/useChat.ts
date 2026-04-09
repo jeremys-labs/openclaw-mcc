@@ -1,6 +1,8 @@
 import { useCallback, useRef } from 'react';
 import { useChatStore } from '../stores/chatStore';
+import { useAgentStore } from '../stores/agentStore';
 import type { ChatAttachment } from '../types/attachments';
+import type { HarnessConfig } from '../types/agent';
 
 const HISTORY_PAGE_SIZE = 100;
 
@@ -26,6 +28,7 @@ export function useChat(agentKey: string) {
   const addMessage = useChatStore((s) => s.addMessage);
   const setDraftAction = useChatStore((s) => s.setDraft);
   const draft = useChatStore((s) => s.drafts[agentKey] ?? '');
+  const updateAgentProvider = useAgentStore((s) => s.updateAgentProvider);
 
   // Track the highest seq we've seen for this agent — used by the safety-net poll
   const latestSeqRef = useRef<Record<string, number>>({});
@@ -183,6 +186,24 @@ export function useChat(agentKey: string) {
     setDraftAction(agentKey, text);
   }, [agentKey, setDraftAction]);
 
+  const updateProvider = useCallback(async (
+    providerType: 'llm' | 'persistent-harness',
+    harnessConfig?: HarnessConfig,
+  ) => {
+    const res = await fetch(`/api/agents/${agentKey}/provider`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ providerType, harnessConfig }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Provider update failed with ${res.status}`);
+    }
+
+    const updated = await res.json();
+    updateAgentProvider(agentKey, updated.providerType, updated.harnessConfig);
+  }, [agentKey, updateAgentProvider]);
+
   return {
     draft,
     setDraft,
@@ -192,5 +213,6 @@ export function useChat(agentKey: string) {
     loadHistory,
     loadOlderMessages,
     interrupt,
+    updateProvider,
   };
 }
