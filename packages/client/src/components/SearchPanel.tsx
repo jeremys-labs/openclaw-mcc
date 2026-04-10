@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Search, X, Loader2 } from 'lucide-react';
 import { useSearch } from '../hooks/useSearch';
 import { ChatMessage } from './ChatMessage';
@@ -12,6 +12,18 @@ interface Props {
 export function SearchPanel({ agentKey, onClose, onJumpToMessage }: Props) {
   const { query, isSearching, results, totalResults, error, search, clearSearch } = useSearch(agentKey);
   const [inputValue, setInputValue] = useState('');
+  const [activeResultIndex, setActiveResultIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    setActiveResultIndex(0);
+  }, [query, totalResults]);
+
+  const activeResult = useMemo(() => results[activeResultIndex] ?? null, [results, activeResultIndex]);
 
   const handleSearch = useCallback(
     (e: React.FormEvent) => {
@@ -24,7 +36,45 @@ export function SearchPanel({ agentKey, onClose, onJumpToMessage }: Props) {
   const handleClear = useCallback(() => {
     setInputValue('');
     clearSearch();
+    setActiveResultIndex(0);
   }, [clearSearch]);
+
+  const handleJump = useCallback(
+    (seq: number) => {
+      onJumpToMessage(seq);
+    },
+    [onJumpToMessage]
+  );
+
+  const handleInputKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (totalResults === 0) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setActiveResultIndex((index) => Math.min(index + 1, totalResults - 1));
+        return;
+      }
+
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActiveResultIndex((index) => Math.max(index - 1, 0));
+        return;
+      }
+
+      if (e.key === 'Enter' && !e.currentTarget.value.trim() && activeResult) {
+        e.preventDefault();
+        handleJump(activeResult.seq);
+      }
+    },
+    [activeResult, handleJump, onClose, totalResults]
+  );
 
   return (
     <div className="flex flex-col h-full bg-surface-raised border-l border-white/10">
@@ -45,9 +95,11 @@ export function SearchPanel({ agentKey, onClose, onJumpToMessage }: Props) {
         {/* Search input */}
         <form onSubmit={handleSearch} className="flex gap-2">
           <input
+            ref={inputRef}
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleInputKeyDown}
             placeholder="Search messages..."
             className="flex-1 px-3 py-2 text-sm bg-surface-input border border-white/10 rounded focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/20"
             disabled={isSearching}
@@ -77,15 +129,21 @@ export function SearchPanel({ agentKey, onClose, onJumpToMessage }: Props) {
         )}
 
         {totalResults > 0 && (
-          <div className="mb-3">
+          <div className="mb-3 flex items-center justify-between gap-3">
             <p className="text-xs text-text-secondary">
               Found {totalResults} message{totalResults !== 1 ? 's' : ''} matching "{query}"
+            </p>
+            <p className="text-[11px] text-text-secondary">
+              {activeResultIndex + 1} / {totalResults} selected
             </p>
           </div>
         )}
 
-        {results.map((msg) => (
-          <div key={msg.seq} className="mb-3 rounded-xl border border-white/10 bg-surface-overlay/60 p-3">
+        {results.map((msg, index) => (
+          <div
+            key={msg.seq}
+            className={`mb-3 rounded-xl border p-3 transition-colors ${index === activeResultIndex ? 'border-primary/60 bg-primary/10' : 'border-white/10 bg-surface-overlay/60'}`}
+          >
             <ChatMessage
               seq={msg.seq}
               role={msg.role}
@@ -99,7 +157,7 @@ export function SearchPanel({ agentKey, onClose, onJumpToMessage }: Props) {
                 {msg.matchCount || 1} match{msg.matchCount === 1 ? '' : 'es'} in message
               </span>
               <button
-                onClick={() => onJumpToMessage(msg.seq)}
+                onClick={() => handleJump(msg.seq)}
                 className="px-2.5 py-1.5 text-xs rounded-lg border border-white/10 bg-surface-raised text-text-primary hover:bg-surface-overlay transition-colors"
               >
                 Jump to message
